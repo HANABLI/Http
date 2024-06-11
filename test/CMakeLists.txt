@@ -20,6 +20,7 @@ target_include_directories(${this} PRIVATE ..)
 target_link_libraries(${this}
     gtest_main
     Http
+    Uri
 )
 
 add_test(
