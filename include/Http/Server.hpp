@@ -82,6 +82,26 @@ namespace Http {
          */
         std::shared_ptr< Request > ParseRequest(const std::string& rawRequest);
 
+        /**
+         * This method parces the given string as a raw Http request message.
+         * If the string parses correctly, the equivalent Request is returned.
+         * otherwise, nullptr is returned.
+         * 
+         * @param[in] rawRequest
+         *      This is the raw HTTP request message as a string.
+         * 
+         * @param[out] messageEnd
+         *      This is the raw HTTP request message as a single string.
+         * 
+         * @return
+         *      The Request object is returned from the given raw 
+         *      Http request string.
+         * 
+         * @retval nullptr
+         *      This is returned if the given rawRequest did not parse correctly.
+         */
+        std::shared_ptr< Request > ParseRequest(const std::string& rawRequest, size_t& messageEnd);
+
     private:
         /* data */
 

@@ -18,6 +18,35 @@ namespace {
     const std::string CRLF("\r\n");
 
     /**
+     * @return 
+     *      An indication of whether or not the number was parsed
+     *      successfully is returned
+     */
+    bool ParseSize(
+        const std::string& stringSize,
+        size_t& number 
+    ) {
+        number = 0;
+        for ( auto c : stringSize ) {
+            if (
+                (c < '0')
+                || (c > '9')
+            ) { 
+                return false;
+            }
+            auto previousNumber = number;
+            number *= 10;
+            number += (uint16_t)(c - '0');
+            if (
+                (number / 10) != previousNumber
+            ) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
      * This method parses the method, target URI, and protocol identifier
      * from the given request line.
      * 
@@ -80,8 +109,12 @@ namespace Http {
 
     }
 
-
     auto Server::ParseRequest(const std::string& rawRequest)-> std::shared_ptr< Request > {
+        size_t messageEnd;
+        return ParseRequest(rawRequest, messageEnd);
+    }
+
+    auto Server::ParseRequest(const std::string& rawRequest, size_t& messageEnd)-> std::shared_ptr< Request > {
         const auto request = std::make_shared< Request >();
         // First, extarct the request line.
         const auto requestLineEnd = rawRequest.find(CRLF);
@@ -94,17 +127,39 @@ namespace Http {
         }
         //Second, parse the message headers and identify where the body begins.
         size_t bodyOffset;
+        size_t headerOffset = requestLineEnd + CRLF.length();
         if (
             !request->headers
                 .ParseRawMessage(
-                    rawRequest.substr(requestLineEnd + CRLF.length()),
+                    rawRequest.substr(headerOffset),
                     bodyOffset
                 )
-            ) {
+        ) {
             return nullptr;
         }
-        //Finally, extract the body
-        request->body = rawRequest.substr(requestLineEnd + CRLF.length() + bodyOffset);
+        // Check for "Content-Length" header, if present, use it to
+        // determine how many characters should be in the body.
+        bodyOffset += headerOffset;
+        const auto maxContentLength = rawRequest.length() - bodyOffset;
+        // If it containt "Content-Length" header, we carefully carve exactly
+        // that number of cahracters out (and bail if we don't have anough) 
+        if (request->headers.HasHeader("Content-Length")) {
+            size_t contentLength;
+            if (!ParseSize(request->headers.GetHeaderValue("Content-Length"), contentLength)) {
+                return nullptr;
+            }
+            if (contentLength > maxContentLength) {
+                return nullptr;
+            } else {
+                request->body = rawRequest.substr(bodyOffset, contentLength);
+                messageEnd = bodyOffset + contentLength;
+            }
+        } else {
+            //Finally, extract the body
+            request->body = rawRequest.substr(bodyOffset);
+            messageEnd = rawRequest.length();
+        }
+        
 
         return request;
     }
