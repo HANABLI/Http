@@ -156,8 +156,8 @@ namespace Http {
             }
         } else {
             //Finally, extract the body
-            request->body = rawRequest.substr(bodyOffset);
-            messageEnd = rawRequest.length();
+            request->body.clear();
+            messageEnd = bodyOffset;
         }
         
 
