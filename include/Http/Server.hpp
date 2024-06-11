@@ -9,11 +9,49 @@
  * © 2024 by Hatem Nabli
  */
 
-#include<memory>
-
+#include <memory>
+#include <string>
+#include <Uri/Uri.hpp>
+#include <MessageHeaders/MessageHeaders.hpp>
 namespace Http {
 
     class Server {
+
+        public:
+        /**
+         * This is represents a HTTP server request structure, decomposed
+         * into its various elements.
+         */
+        struct Request
+        {
+            /**
+             * This is the request method to be performed on the
+             * target resource.
+             */
+            std::string method;
+
+            /**
+             * This identifies the target resource upon which to apply
+             * the request.
+             */
+            Uri::Uri target;
+
+            /**
+             * This are the messages headers that were included 
+             * in the request
+             */
+            MessageHeaders::MessageHeaders headers;
+
+            /**
+             * This is the body of the request, if there is a body.
+             */
+            std::string body;
+
+        };
+        
+
+        // LifeCycle managment
+    public:
         ~Server();
         Server(const Server&) = delete; // Copy Constructor that creates a new object by making a copy of an existing object. 
         //It ensures that a deep copy is performed if the object contains dynamically allocated resources 
@@ -26,6 +64,23 @@ namespace Http {
         * This is the default constructor
         */
         Server();
+
+        /**
+         * This method parces the given string as a raw Http request message.
+         * If the string parses correctly, the equivalent Request is returned.
+         * otherwise, nullptr is returned.
+         * 
+         * @param[in] rawRequest
+         *      This is the raw HTTP request message as a string.
+         * 
+         * @return
+         *      The Request object is returned from the given raw 
+         *      Http request string.
+         * 
+         * @retval nullptr
+         *      This is returned if the given rawRequest did not parse correctly.
+         */
+        std::shared_ptr< Request > ParseRequest(const std::string& rawRequest);
 
     private:
         /* data */
