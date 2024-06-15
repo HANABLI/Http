@@ -7,7 +7,52 @@
 
 #include <gtest/gtest.h>
 #include <Http/Server.hpp>
+#include <Http/ServerTransportLayer.hpp>
 #include <Uri/Uri.hpp>
+
+namespace {
+
+    /**
+     * This is a fake transport layer which is used to test the server.
+     */
+    struct MockTransport : public Http::ServerTransportLayer {
+        // Properties
+
+        /**
+         * This flag indicates whether or not the transport layer
+         * has been bound by the server.
+         */
+        bool bound = false;
+
+        /**
+         * This is the port number that the server bound on the 
+         * transport layer.
+         */
+        uint16_t port = 0;
+
+        NewConnectionDelegate connectionDelegate;
+        // Methods
+
+        // Http::ServerTransport
+
+        virtual void SetNewConnectionDelegate(NewConnectionDelegate newConnectionDelegate) {
+            connectionDelegate = newConnectionDelegate;
+        }
+
+        virtual bool BindNetwork(
+            uint16_t newPort,
+            NewConnectionDelegate newConnectionDelegate
+        ) override {
+            port = newPort;
+            bound = true;
+            return true;
+        }
+
+        virtual void ReleaseNetwork() override {
+            bound = false;
+        }
+    };
+}
 
 TEST(ServerTests, ServerTests_ParseGetRequest_Test) {
     Http::Server server;
@@ -158,4 +203,28 @@ TEST(ServerTests, RequestWithNoContentLengthOrChunkedTransferEncodingHasNoBody) 
     Uri::Uri expectedUri;
     expectedUri.ParseFromString("/hello.txt");
     ASSERT_TRUE(request->body.empty());
+}
+
+TEST(ServerTests, ServerTests_Mobiliz_Test) {
+    auto transport = std::make_shared< MockTransport >();
+    Http::Server server;
+    ASSERT_TRUE(server.Mobilize(transport, 1234));
+    ASSERT_EQ(1234, transport->port);
+}
+
+TEST(ServerTests, ServerTests_Demobilize_Test) {
+    auto transport = std::make_shared< MockTransport >();
+    Http::Server server;
+    (void)server.Mobilize(transport, 1234);
+    server.Demobilize();
+    ASSERT_FALSE(transport->bound);
+}
+
+TEST(ServerTests, ServerTests_ReleaseNetworkUponDestruction_Test) {
+    auto transport = std::make_shared< MockTransport >();
+    {
+        Http::Server server;
+        (void)server.Mobilize(transport, 1234);
+    }
+    ASSERT_FALSE(transport->bound);
 }
