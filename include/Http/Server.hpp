@@ -106,7 +106,7 @@ namespace Http {
          * @retval nullptr
          *      This is returned if the given rawRequest did not parse correctly.
          */
-        std::shared_ptr< Request > ParseRequest(const std::string& rawRequest);
+        static std::shared_ptr< Request > ParseRequest(const std::string& rawRequest);
 
         /**
          * This method parces the given string as a raw Http request message.
@@ -126,7 +126,7 @@ namespace Http {
          * @retval nullptr
          *      This is returned if the given rawRequest did not parse correctly.
          */
-        std::shared_ptr< Request > ParseRequest(const std::string& rawRequest, size_t& messageEnd);
+        static std::shared_ptr< Request > ParseRequest(const std::string& rawRequest, size_t& messageEnd);
 
     private:
         /* data */
