@@ -9,6 +9,8 @@ set(this Http)
 set(Headers 
     include/Http/Server.hpp
     include/Http/Client.hpp
+    include/Http/Connection.hpp
+    include/Http/ServerTransportLayer.hpp
 )
 
 set(Sources 
@@ -25,6 +27,7 @@ target_include_directories(${this} PUBLIC include)
 
 target_link_libraries(${this} PUBLIC
     MessageHeaders
+    StringUtils
     Uri
 )
 

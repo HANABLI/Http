@@ -99,10 +99,19 @@ namespace Http {
 
     struct Server::Impl
     {
+        /**
+         * This is the transport layer currently bound.
+         */
+        std::shared_ptr< ServerTransportLayer > transport;
         
+        void NewConnection(std::shared_ptr< Connection > connection) {
+
+        }
     };
 
-    Server::~Server() = default;
+    Server::~Server() {
+        Demobilize();
+    };
 
     Server::Server()
          : impl_(new Impl) {
@@ -164,4 +173,27 @@ namespace Http {
         return request;
     }
     
+    bool Server::Mobilize(
+        std::shared_ptr< ServerTransportLayer > transport,
+        uint16_t port
+    ) {
+        impl_->transport = transport;
+        if (!impl_->transport->BindNetwork(
+            port,
+            [this](std::shared_ptr< Connection > connection) {
+                impl_->NewConnection(connection);
+            }
+        )) {
+            impl_->transport = nullptr;
+            return false;
+        }
+        return true;
+    }
+
+    void Server::Demobilize() {
+        if (impl_->transport != nullptr) {
+            impl_->transport->ReleaseNetwork();
+            impl_->transport = nullptr;
+        }
+    }
 }
