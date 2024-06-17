@@ -8,9 +8,57 @@
 #include <gtest/gtest.h>
 #include <Http/Server.hpp>
 #include <Http/ServerTransportLayer.hpp>
+#include <Http/Connection.hpp>
 #include <Uri/Uri.hpp>
 
 namespace {
+
+    /**
+     * This is a fake client connection which is used to test the server.
+     */
+    struct MockConnection : public Http::Connection
+    {
+        // Properies
+
+        /**
+         * This is the delegate to call whenever data is received from
+         * the remote peer.
+         */
+        DataReceivedDelegate dataReceivedDelegate;
+
+        /**
+         * This is the delegate to call whenever connection has been broken.
+         */
+        BrokenDelegate brokenDelegate;
+
+        /**
+         * This is the data received from the remote peer.
+         */
+        std::vector< uint8_t > dataReceived;
+
+        // Methods
+
+        // Http::Connection
+
+        virtual void SetDataReceivedDelegate(DataReceivedDelegate newDataReceivedDelegate) override {
+            dataReceivedDelegate = newDataReceivedDelegate;
+        }
+
+        virtual void SetConnectionBrokenDelegate(BrokenDelegate newBrokenDelegate) override {
+            brokenDelegate = newBrokenDelegate;
+        }
+
+        virtual void SendData(std::vector< uint8_t > data) override {
+            (void)dataReceived.insert(
+                dataReceived.end(),
+                data.begin(),
+                data.end()
+            );
+        }
+
+        virtual void Break(bool clean) override {
+        }
+    };
 
     /**
      * This is a fake transport layer which is used to test the server.
@@ -35,15 +83,12 @@ namespace {
 
         // Http::ServerTransport
 
-        virtual void SetNewConnectionDelegate(NewConnectionDelegate newConnectionDelegate) {
-            connectionDelegate = newConnectionDelegate;
-        }
-
         virtual bool BindNetwork(
             uint16_t newPort,
             NewConnectionDelegate newConnectionDelegate
         ) override {
             port = newPort;
+            connectionDelegate = newConnectionDelegate;
             bound = true;
             return true;
         }
@@ -210,6 +255,7 @@ TEST(ServerTests, ServerTests_Mobiliz_Test) {
     Http::Server server;
     ASSERT_TRUE(server.Mobilize(transport, 1234));
     ASSERT_EQ(1234, transport->port);
+    ASSERT_FALSE(transport->connectionDelegate == nullptr);
 }
 
 TEST(ServerTests, ServerTests_Demobilize_Test) {
@@ -227,4 +273,137 @@ TEST(ServerTests, ServerTests_ReleaseNetworkUponDestruction_Test) {
         (void)server.Mobilize(transport, 1234);
     }
     ASSERT_FALSE(transport->bound);
+}
+
+TEST(ServerTests, Expect404FromClientRequest) {
+    auto transport = std::make_shared< MockTransport >();
+    Http::Server Server;
+    (void)Server.Mobilize(transport, 1234);
+    auto connection = std::make_shared< MockConnection >();
+    transport->connectionDelegate(connection);
+    ASSERT_FALSE(connection->dataReceivedDelegate == nullptr);
+    const std::string request(
+        "GET /hello.txt HTTP/1.1\r\n"
+        "User-Agent: curl/7.16.3 libcurl/7.16.3 OpenSSL/0.9.7l zlib/1.2.3\r\n"
+        "Host: www.example.com\r\n"
+        "Accept-Language: en, mi\r\n"
+        "\r\n"
+    );
+    ASSERT_TRUE(connection->dataReceived.empty());
+    connection->dataReceivedDelegate(   
+        std::vector< uint8_t >(
+            request.begin(),
+            request.end()
+        )
+    );
+    const std::string expectedResponse = (
+        "HTTP/1.1 404 Not Found\r\n"
+        "Content-Length: 13\r\n"
+        "Content-Type: text/plain\r\n"
+        "\r\n"
+        "BadRequest.\r\n"
+      );
+    ASSERT_EQ(
+        expectedResponse,
+        std::string(
+            connection->dataReceived.begin(),
+            connection->dataReceived.end()
+        )
+    );
+}
+
+TEST(ServerTests, ServerTests_Expect404FromClientRequestInTwoPieces__Test) {
+    auto transport = std::make_shared< MockTransport >();
+    Http::Server Server;
+    (void)Server.Mobilize(transport, 1234);
+    auto connection = std::make_shared< MockConnection >();
+    transport->connectionDelegate(connection);
+    ASSERT_FALSE(connection->dataReceivedDelegate == nullptr);
+    std::string request(
+        "GET /hello.txt HTTP/1.1\r\n"
+        "User-Agent: curl/7.16.3 libcurl/7.16.3 OpenSSL/0.9.7l zlib/1.2.3\r\n"
+        "Host: www.example.com\r\n"
+        "Accept-Language: en, mi\r\n"
+        "\r\n"
+    );
+    ASSERT_TRUE(connection->dataReceived.empty());
+    connection->dataReceivedDelegate(   
+        std::vector< uint8_t >(
+            request.begin(),
+            request.begin() + request.length() / 2
+        )
+    );
+    ASSERT_TRUE(connection->dataReceived.empty());
+    connection->dataReceivedDelegate(   
+        std::vector< uint8_t >(
+            request.begin() + request.length() / 2,
+            request.end()
+        )
+    );
+    const std::string expectedResponse = (
+        "HTTP/1.1 404 Not Found\r\n"
+        "Content-Length: 13\r\n"
+        "Content-Type: text/plain\r\n"
+        "\r\n"
+        "BadRequest.\r\n"
+      );
+    ASSERT_EQ(
+        expectedResponse,
+        std::string(
+            connection->dataReceived.begin(),
+            connection->dataReceived.end()
+        )
+    );
+}
+
+
+TEST(ServerTests, twoClientRequestsInOnePiece) {
+        auto transport = std::make_shared< MockTransport >();
+    Http::Server Server;
+    (void)Server.Mobilize(transport, 1234);
+    auto connection = std::make_shared< MockConnection >();
+    transport->connectionDelegate(connection);
+    ASSERT_FALSE(connection->dataReceivedDelegate == nullptr);
+    std::string requests(
+        "GET /hello.txt HTTP/1.1\r\n"
+        "User-Agent: curl/7.16.3 libcurl/7.16.3 OpenSSL/0.9.7l zlib/1.2.3\r\n"
+        "Host: www.example.com\r\n"
+        "Accept-Language: en, mi\r\n"
+        "\r\n"
+        "GET /hello.txt HTTP/1.1\r\n"
+        "User-Agent: curl/7.16.3 libcurl/7.16.3 OpenSSL/0.9.7l zlib/1.2.3\r\n"
+        "Host: www.example.com\r\n"
+        "Accept-Language: en, mi\r\n"
+        "\r\n"
+    );
+    ASSERT_TRUE(connection->dataReceived.empty());
+    connection->dataReceivedDelegate(   
+        std::vector< uint8_t >(
+            requests.begin(),
+            requests.end()
+        )
+    );
+    const std::string expectedResponses = (
+        "HTTP/1.1 404 Not Found\r\n"
+        "Content-Length: 13\r\n"
+        "Content-Type: text/plain\r\n"
+        "\r\n"
+        "BadRequest.\r\n"
+        "HTTP/1.1 404 Not Found\r\n"
+        "Content-Length: 13\r\n"
+        "Content-Type: text/plain\r\n"
+        "\r\n"
+        "BadRequest.\r\n"
+      );
+    ASSERT_EQ(
+        expectedResponses,
+        std::string(
+            connection->dataReceived.begin(),
+            connection->dataReceived.end()
+        )
+    );
+}
+
+TEST(ServerTests, Client){
+
 }
