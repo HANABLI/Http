@@ -7,6 +7,8 @@
  * © 2024 by Hatem Nabli
  */
 
+#include <set>
+#include <string>
 #include <Http/Server.hpp>
 
 namespace {
@@ -89,6 +91,54 @@ namespace {
         return (protocol == "HTTP/1.1");
     }
 
+    /**
+     *  This structure holds onto all state information the server has
+     *  about a single connection from a client.
+     */
+    struct ConnectionState {
+
+        /**
+         * This is the transport interface of the connection.
+         */
+        std::shared_ptr< Http::Connection > connection;
+
+        /**
+         * This buffer is used to conctatenate fragmented HTTP requests
+         * received from the client.
+         */
+        std::string concatenateBuffer;
+
+        // Methods
+        /**
+         * This method appends the given data to the end of the concatenate
+         * buffer, and then attempts to parse a request out of it.
+         * 
+         * @return 
+         *      The request parsed from the concatenate buffer is returned.
+         * 
+         * @retval nullptr
+         *      This is returned if no request could be parsed from the 
+         *      concatinate buffer
+         */
+        std::shared_ptr< Http::Server::Request > TryRequestAssembly() {
+            size_t messageEnd;
+            const auto request = Http::Server::ParseRequest(
+                concatenateBuffer,
+                messageEnd
+            );
+            if (request == nullptr) {
+                return nullptr;
+            }
+            concatenateBuffer.erase(
+                concatenateBuffer.begin(),
+                concatenateBuffer.begin() + messageEnd
+            );
+
+            return request;
+        }
+
+    };
+
 }
 
 namespace Http {
@@ -104,8 +154,72 @@ namespace Http {
          */
         std::shared_ptr< ServerTransportLayer > transport;
         
-        void NewConnection(std::shared_ptr< Connection > connection) {
+        /**
+         * These are the currently established connections.
+         */
+        std::set< std::shared_ptr< ConnectionState > > establishedConnections;
 
+        /**
+         * This method is called when new data is received from a connection
+         * 
+         * @param[in] connectionState
+         *      This is the connection state of the connection from which 
+         *      data was received.
+         * 
+         * @param[in] data
+         *      This is a copy of the data that was received from 
+         *      the connection.
+         */
+        void DataReceived(
+            std::shared_ptr< ConnectionState > connectionState,
+            std::vector< uint8_t > data
+        ) {
+            connectionState->concatenateBuffer += std::string(data.begin(), data.end());
+            for (;;) {
+                const auto request = connectionState->TryRequestAssembly();
+                if (request == nullptr) {
+                    break;
+                }
+                const std::string cannedResponse = (
+                    "HTTP/1.1 404 Not Found\r\n"
+                    "Content-Length: 13\r\n"
+                    "Content-Type: text/plain\r\n"
+                    "\r\n"
+                    "BadRequest.\r\n"
+                );
+                connectionState->connection->SendData(
+                    std::vector< uint8_t >(
+                        cannedResponse.begin(),
+                        cannedResponse.end()
+                    )
+                );
+            }
+        }
+
+        /**
+         * This method is called when a new connection has been
+         * established for the server.
+         * 
+         * @param[in] connection
+         *      This is the new connection has been established for the server.
+         */
+        void NewConnection(std::shared_ptr< Connection > connection) {
+            const auto connectionState = std::make_shared< ConnectionState >();
+            connectionState->connection = connection;
+            (void)establishedConnections.insert(connectionState);
+            std::weak_ptr< ConnectionState > connectionStateWeak(connectionState);
+            connectionState->connection->SetDataReceivedDelegate(
+                [this, connectionStateWeak](std::vector< uint8_t > data){
+                    const auto connectionState = connectionStateWeak.lock();
+                    if (connectionState == nullptr) {
+                        return;
+                    }
+                    DataReceived(
+                        connectionState,
+                        data
+                    );
+                }
+            );
         }
     };
 
@@ -169,7 +283,6 @@ namespace Http {
             messageEnd = bodyOffset;
         }
         
-
         return request;
     }
     
