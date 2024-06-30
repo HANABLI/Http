@@ -138,14 +138,18 @@ namespace Http {
         //Second, parse the message headers and identify where the body begins.
         size_t bodyOffset;
         size_t headerOffset = responseLineEnd + CRLF.length();
-        if (
-            !response->headers
+        switch (
+            response->headers
                 .ParseRawMessage(
                     rawResponse.substr(headerOffset),
                     bodyOffset
                 )
         ) {
-            return nullptr;
+            case MessageHeaders::MessageHeaders::Validity::Valid: break;
+            case MessageHeaders::MessageHeaders::Validity::ValidIncomplete: return nullptr;
+            case MessageHeaders::MessageHeaders::Validity::InvalidRecoverable: return nullptr;
+            case MessageHeaders::MessageHeaders::Validity::InvalidUnrecoverable: 
+            default: return nullptr;
         }
         // Check for "Content-Length" header, if present, use it to
         // determine how many characters should be in the body.

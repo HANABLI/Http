@@ -12,6 +12,7 @@
 #include "ServerTransportLayer.hpp"
 
 #include <memory>
+#include <ostream>
 #include <stdint.h>
 #include <string>
 #include <Uri/Uri.hpp>
@@ -27,6 +28,21 @@ namespace Http {
          */
         struct Request
         {
+            /**
+             * These are the different validity states 
+             * that a request can have.
+             */
+            enum class Validity {
+
+                Valid, ///< request parsed successfully
+
+                ValidIncomplete,
+
+                InvalidRecoverable, ///< bad request but server can keep connection
+
+                InvalidUnrecoverable ///< bad request, server should close connection
+
+            };
             /**
              * This is the request method to be performed on the
              * target resource.
@@ -50,6 +66,12 @@ namespace Http {
              */
             std::string body;
 
+            /**
+             * This flag indicates whether or not the request
+             * was parced correctly. connection can still be used in some
+             * invalidity cases.
+             */
+            Validity validity = Validity::Valid;
         };
         
 
@@ -124,9 +146,11 @@ namespace Http {
          *      Http request string.
          * 
          * @retval nullptr
-         *      This is returned if the given rawRequest did not parse correctly.
+         *      This is returned if the given rawRequest is incomplete or did not parse correctly.
          */
         static std::shared_ptr< Request > ParseRequest(const std::string& rawRequest, size_t& messageEnd);
+
+
 
     private:
         /* data */
@@ -143,6 +167,21 @@ namespace Http {
         */       
         std::unique_ptr<struct Impl> impl_;
     };
+
+    /**
+     * This is a support function for googleTest to print out
+     * values of the Server::Request::Validity class.
+     * 
+     * @param[in] validity
+     *      This is the validity to print out.
+     * 
+     * @param[in] os
+     *      This is a pointer to the stream to wish to print the validity.
+     */
+    void PrintTo(
+        const Server::Request::Validity& validity,
+        std::ostream* os
+    );
 }
 
 #endif /* HTTP_SERVER_HPP */

@@ -20,6 +20,16 @@ namespace {
     const std::string CRLF("\r\n");
 
     /**
+     * This is the maximum allowed request body size.
+     */
+    constexpr size_t MAX_CONTENT_LENGTH = 10000000;
+
+    /**
+     * This is the maximum allowed request header line size.
+     */
+    constexpr size_t HEADER_LINE_LIMIT = 1000;
+
+    /**
      * @return 
      *      An indication of whether or not the number was parsed
      *      successfully is returned
@@ -72,9 +82,16 @@ namespace {
         }
 
         request->method = requestLine.substr(0, methodDelimiter);
+        if (request->method.empty()) {
+            return false;
+        }
 
         // Parse the target URI.
         const auto targetDelimiter = requestLine.find(' ', methodDelimiter + 1);
+        const auto targetLength = targetDelimiter - methodDelimiter -1;
+        if (targetLength == 0 ) {
+            return false;
+        }
         if (!request->target.ParseFromString(
                 requestLine.substr(
                     methodDelimiter + 1, 
@@ -180,19 +197,39 @@ namespace Http {
                 if (request == nullptr) {
                     break;
                 }
-                const std::string cannedResponse = (
-                    "HTTP/1.1 404 Not Found\r\n"
-                    "Content-Length: 13\r\n"
-                    "Content-Type: text/plain\r\n"
-                    "\r\n"
-                    "BadRequest.\r\n"
-                );
+                std::string response;
+                if (request->validity == Request::Validity::Valid) {
+                    const std::string cannedResponse = (
+                        "HTTP/1.1 404 Not Found\r\n"
+                        "Content-Length: 13\r\n"
+                        "Content-Type: text/plain\r\n"
+                        "\r\n"
+                        "BadRequest.\r\n"
+                    );
+                    response = cannedResponse;
+                } else {
+                    const std::string cannedResponse = (
+                        "HTTP/1.1 400 Bad Request\r\n"
+                        "Content-Length: 13\r\n"
+                        "Content-Type: text/plain\r\n"
+                        "\r\n"
+                        "BadRequest.\r\n"
+                    );
+                    response = cannedResponse;
+                }
+
                 connectionState->connection->SendData(
                     std::vector< uint8_t >(
-                        cannedResponse.begin(),
-                        cannedResponse.end()
+                        response.begin(),
+                        response.end()
                     )
                 );
+                if (request->validity != Request::Validity::Valid) {
+                    if(request->validity == Request::Validity::InvalidUnrecoverable) {
+                        connectionState->connection->Break(true);
+                    }
+                    break;
+                }
             }
         }
 
@@ -239,6 +276,7 @@ namespace Http {
 
     auto Server::ParseRequest(const std::string& rawRequest, size_t& messageEnd)-> std::shared_ptr< Request > {
         const auto request = std::make_shared< Request >();
+        messageEnd = 0;
         // First, extarct the request line.
         const auto requestLineEnd = rawRequest.find(CRLF);
         if (requestLineEnd == std::string::npos) {
@@ -246,32 +284,51 @@ namespace Http {
         }
         const auto requestLine = rawRequest.substr(0, requestLineEnd);
         if (!ParseRequestLine(request, requestLine)) {
-            return nullptr;
+            request->validity = Request::Validity::InvalidRecoverable;
         }
         //Second, parse the message headers and identify where the body begins.
-        size_t bodyOffset;
-        size_t headerOffset = requestLineEnd + CRLF.length();
-        if (
-            !request->headers
+        size_t bodyOffset = 0;
+        const auto headerOffset = requestLineEnd + CRLF.length();
+        request->headers.SetLineLimit(HEADER_LINE_LIMIT);
+        switch (
+            request->headers
                 .ParseRawMessage(
                     rawRequest.substr(headerOffset),
                     bodyOffset
                 )
         ) {
-            return nullptr;
+            case MessageHeaders::MessageHeaders::Validity::Valid: break;
+
+            case MessageHeaders::MessageHeaders::Validity::ValidIncomplete : return nullptr;
+            
+            case MessageHeaders::MessageHeaders::Validity::InvalidRecoverable: 
+            {
+                request->validity = Request::Validity::InvalidRecoverable;
+            } break;
+            case MessageHeaders::MessageHeaders::Validity::InvalidUnrecoverable: 
+            default: 
+            {
+                request->validity = Request::Validity::InvalidUnrecoverable;
+                return request;
+            }
         }
         // Check for "Content-Length" header, if present, use it to
         // determine how many characters should be in the body.
         bodyOffset += headerOffset;
-        const auto maxContentLength = rawRequest.length() - bodyOffset;
+        const auto bodyAvailableSize = rawRequest.length() - bodyOffset;
         // If it containt "Content-Length" header, we carefully carve exactly
         // that number of cahracters out (and bail if we don't have anough) 
         if (request->headers.HasHeader("Content-Length")) {
             size_t contentLength;
-            if (!ParseSize(request->headers.GetHeaderValue("Content-Length"), contentLength)) {
-                return nullptr;
+            if (!ParseSize(request->headers.GetHeaderValue("Content-Length"), contentLength)) { 
+                request->validity = Request::Validity::InvalidUnrecoverable;
+                return request;
             }
-            if (contentLength > maxContentLength) {
+            if (contentLength > MAX_CONTENT_LENGTH) {
+                request->validity = Request::Validity::InvalidUnrecoverable;
+                return request;
+            } 
+            if (contentLength > bodyAvailableSize) {
                 return nullptr;
             } else {
                 request->body = rawRequest.substr(bodyOffset, contentLength);
@@ -286,6 +343,30 @@ namespace Http {
         return request;
     }
     
+
+    void PrintTo(
+        const Server::Request::Validity& validity,
+        std::ostream* os
+    ) {
+        switch (validity) {
+            case Server::Request::Validity::Valid: {
+                *os << "VALID";
+            } break;
+            case Server::Request::Validity::ValidIncomplete: {
+                *os << "VALID (Incomplete)";
+            } break;
+            case Server::Request::Validity::InvalidRecoverable: {
+                *os << "INVALID (Recoverable)";
+            } break;
+            case Server::Request::Validity::InvalidUnrecoverable: {
+                *os << "INVALID (Unrecoverable)";
+            } break;
+            default: {
+                *os << "???";
+            }
+        }
+    }
+
     bool Server::Mobilize(
         std::shared_ptr< ServerTransportLayer > transport,
         uint16_t port
