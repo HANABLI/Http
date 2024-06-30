@@ -40,13 +40,6 @@ namespace Http
 
         // Methods
     public:
-        /**
-         * This method sets the delegate to call whenever a new connection 
-         * has been established for the server
-         * 
-         */
-        virtual void SetNewConnectionDelegate(NewConnectionDelegate newConnectionDelegate) = 0;
-        
 
         /**
          * This method acquires exclusive access to the given port
