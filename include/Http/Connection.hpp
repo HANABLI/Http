@@ -34,11 +34,8 @@ namespace Http {
          * This delegate is used to notify the user that the connection
          * has been broken.
          */
-        typedef std::function< void() > BrokenDelegate;
+        typedef std::function< void(bool graceful) > BrokenDelegate;
 
-    public:
-        Connection(/* args */);
-        ~Connection();
 
         // Methods
     public:
@@ -79,10 +76,17 @@ namespace Http {
          * @param[in] data
          *      This is the data to send to the remote peer.
          */
-        virtual void sendData(std::vector< uint8_t > data) = 0;
+        virtual void SendData(std::vector< uint8_t > data) = 0;
 
-    private:
-        /* data */
+        /**
+         * This method break the connection to the remote peer.
+         * 
+         * @param[in] clean
+         *      This flag idicates whenever or not to attempt to complete
+         *      any data transmission still in progress, before breaking
+         *      the connection.
+         */
+        virtual void Break(bool clean) = 0;
     };
 
     
