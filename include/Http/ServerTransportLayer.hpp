@@ -61,6 +61,12 @@ namespace Http
         virtual bool BindNetwork(uint16_t port, NewConnectionDelegate newConnectionDelegate) = 0;
 
         /**
+         * This method return the public port number that was bound
+         * for accepting connections from clients.
+         */
+        virtual uint16_t GetBoundPort() = 0;
+        
+        /**
          * This method releases all resources and access that were acquired
          * as a result of calling the BindNetwork method.
          */

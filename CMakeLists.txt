@@ -28,6 +28,7 @@ target_include_directories(${this} PUBLIC include)
 target_link_libraries(${this} PUBLIC
     MessageHeaders
     StringUtils
+    SystemUtils
     Uri
 )
 
