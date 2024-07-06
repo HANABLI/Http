@@ -11,6 +11,10 @@
 #include <inttypes.h>
 #include <string>
 #include <Http/Server.hpp>
+#include <condition_variable>
+#include <thread>
+#include <memory>
+#include <mutex>
 
 namespace {
     /**
@@ -178,17 +182,76 @@ namespace Http {
         std::set< std::shared_ptr< ConnectionState > > establishedConnections;
 
         /**
+         * These are the client connections that have been broken an will
+         * be destroyed by the reaper thread.
+         */
+        std::set< std::shared_ptr< ConnectionState > > brokenConnections;
+
+        /**
          * This is a helper object used to generate and publish
          * diagnostic messages.
          */
         SystemUtils::DiagnosticsSender diagnosticsSender;
 
         /**
+         * This is a worker thread whose jobe is to clear the
+         * brokenConnections set. The reason we need to put broken
+         * connections there in the first place is because we can't
+         * destroy a connection that is in the process of calling
+         * us through one of the delegates we gave it.
+         */
+        std::thread reaper;
+
+        /**
+         * This flag indicates whether or not the reaper thread should stop.
+         */
+        bool stopReaper = false;
+
+        /**
+         * This is used to synchronize access to the server.
+         */
+        std::mutex mutex;
+
+        /**
+         * This is used by the reaper thread to wait on any
+         * condition that it should cause it to wake up.
+         */
+        std::condition_variable condition;
+
+        /**
          * This is the constructor for the structure
          */
         Impl(): diagnosticsSender("Http::Server"){
 
-        };
+        }
+
+        /**
+         * This method is the body of the reaper thread.
+         * Until it's told to stop, it simply clears the
+         * brokenConnections set whenever it wakes up.
+         */
+        void Reaper() {
+            std::unique_lock< decltype(mutex) > lock(mutex);
+            while (!stopReaper) {
+                std::set< std::shared_ptr< ConnectionState > > oldBrokenConnections(std::move(brokenConnections));
+                brokenConnections.clear();
+                {
+                    lock.unlock();
+                    oldBrokenConnections.clear();
+                    lock.lock();
+                }
+                condition.wait(
+                    lock,
+                    [this]{
+                        return (
+                            stopReaper || !brokenConnections.empty()
+                        );
+                    }
+                );
+            }
+        }
+
+
         /**
          * This method is called when new data is received from a connection
          * 
@@ -274,6 +337,7 @@ namespace Http {
          *      This is the new connection has been established for the server.
          */
         void NewConnection(std::shared_ptr< Connection > connection) {
+            std::lock_guard< decltype(mutex) > lock(mutex);
             diagnosticsSender.SendDiagnosticInformationFormatted(
                 2,
                 "New connection from %s",
@@ -285,6 +349,7 @@ namespace Http {
             std::weak_ptr< ConnectionState > connectionStateWeak(connectionState);
             connectionState->connection->SetDataReceivedDelegate(
                 [this, connectionStateWeak](std::vector< uint8_t > data){
+                    std::lock_guard< decltype(mutex) > lock(mutex);
                     const auto connectionState = connectionStateWeak.lock();
                     if (connectionState == nullptr) {
                         return;
@@ -295,16 +360,39 @@ namespace Http {
                     );
                 }
             );
+            connection->SetConnectionBrokenDelegate(
+                [this, connectionStateWeak](bool graceful){
+                    std::lock_guard< decltype(mutex) > lock(mutex);
+                    const auto connectionState = connectionStateWeak.lock();
+                    if (connectionState == nullptr) {
+                        return;
+                    }
+                    diagnosticsSender.SendDiagnosticInformationFormatted(
+                        2, 
+                        "Connection to %s is broken by peer",
+                        connectionState->connection->GetPeerId().c_str()
+                    );
+                    (void)brokenConnections.insert(connectionState);
+                    condition.notify_all();
+                    (void)establishedConnections.erase(connectionState);
+                }
+            );
         }
     };
 
     Server::~Server() {
         Demobilize();
+        {
+            std::lock_guard< decltype(impl_->mutex) > lock(impl_->mutex);
+            impl_->stopReaper = true;
+            impl_->condition.notify_all();
+        }
+        impl_->reaper.join();
     };
 
     Server::Server()
          : impl_(new Impl) {
-
+            impl_->reaper = std::thread(&Impl::Reaper, impl_.get());
     }
 
     SystemUtils::DiagnosticsSender::UnsubscribeDelegate Server::SubscribeToDiagnostics(

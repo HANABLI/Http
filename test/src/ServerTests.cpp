@@ -117,8 +117,57 @@ namespace {
     };
 }
 
-TEST(ServerTests, ServerTests_ParseGetRequest_Test) {
+struct ServerTests : public ::testing::Test
+{
+    // Properties
+    /**
+     * This is the unit under test server.
+     */
     Http::Server server;
+    /**
+     * These are the diagnostic messages that have been received 
+     * from the unit under test.
+     */
+    std::vector< std::string > diagnosticMessages;
+    /**
+     * This is the delegate obtained when subscribing 
+     * to receive diagnostic messages from the unit under test.
+     * It's called to terminate the subscription.
+     */
+    SystemUtils::DiagnosticsSender::UnsubscribeDelegate diagnosticsUnsubscribeDelegate;
+    // Methods
+
+
+    // ::testing::Test
+
+    virtual void SetUp() {   
+        server.SubscribeToDiagnostics(
+            [this](
+                std::string senderName,
+                size_t level,
+                std::string message
+            ){
+                diagnosticMessages.push_back(
+                    StringUtils::sprintf(
+                        "%s[%zu]: %s",
+                        senderName.c_str(),
+                        level,
+                        message.c_str()
+                    )
+                );
+            },
+            0
+        );
+    }
+
+    virtual void TearDown() {
+        server.Demobilize();
+        //diagnosticsUnsubscribeDelegate();
+        
+    }
+};
+
+TEST_F(ServerTests, ServerTests_ParseGetRequest_Test) {
     const auto request = server.ParseRequest(
         "GET /hello.txt HTTP/1.1\r\n"
         "User-Agent: curl/7.16.3 libcurl/7.16.3 OpenSSL/0.9.7l zlib/1.2.3\r\n"
@@ -142,8 +191,7 @@ TEST(ServerTests, ServerTests_ParseGetRequest_Test) {
 }
 
 
-TEST(ServerTests, ServerTests_ParsePostRequest_Test) {
-    Http::Server server;
+TEST_F(ServerTests, ServerTests_ParsePostRequest_Test) {
     size_t messageEnd;
     const std::string rawRequest = ("POST /test HTTP/1.1\r\n"
         "Host: foo.example\r\n"
@@ -168,8 +216,7 @@ TEST(ServerTests, ServerTests_ParsePostRequest_Test) {
     ASSERT_EQ(rawRequest.length() - 2, messageEnd);
 }
 
-TEST(ServerTests, ServerTests_ParseInvalidRequestNoMethod_Test) {
-    Http::Server server;
+TEST_F(ServerTests, ServerTests_ParseInvalidRequestNoMethod_Test) {
     size_t messageEnd;
     const std::string rawRequest = (        
         " /hello.txt HTTP/1.1\r\n"
@@ -186,8 +233,7 @@ TEST(ServerTests, ServerTests_ParseInvalidRequestNoMethod_Test) {
     ASSERT_EQ(Http::Server::Request::Validity::InvalidRecoverable, request->validity);
 }
 
-TEST(ServerTests, ServerTests_ParseIncompleteBodyRequ_Test) {
-    Http::Server server;
+TEST_F(ServerTests, ServerTests_ParseIncompleteBodyRequ_Test) {
     size_t messageEnd;
     const std::string rawRequest = ("POST /test HTTP/1.1\r\n"
         "Host: foo.example\r\n"
@@ -202,8 +248,7 @@ TEST(ServerTests, ServerTests_ParseIncompleteBodyRequ_Test) {
     ASSERT_TRUE(request == nullptr);
 }
 
-TEST(ServerTests, ServerTests_ParseIncompleteHeadersRequ_Test) {
-    Http::Server server;
+TEST_F(ServerTests, ServerTests_ParseIncompleteHeadersRequ_Test) {
     size_t messageEnd;
     const std::string rawRequest = ("POST /test HTTP/1.1\r\n"
         "Host: foo.example\r\n"
@@ -218,8 +263,7 @@ TEST(ServerTests, ServerTests_ParseIncompleteHeadersRequ_Test) {
     ASSERT_TRUE(request == nullptr);
 }
 
-TEST(ServerTests, ServerTests_ParseIncompleteMidLineHeadersRequ_Test) {
-    Http::Server server;
+TEST_F(ServerTests, ServerTests_ParseIncompleteMidLineHeadersRequ_Test) {
     size_t messageEnd;
     const std::string rawRequest = ("POST /test HTTP/1.1\r\n"
         "Host: foo.example\r\n"
@@ -231,8 +275,7 @@ TEST(ServerTests, ServerTests_ParseIncompleteMidLineHeadersRequ_Test) {
     ASSERT_TRUE(request == nullptr);
 }
 
-TEST(ServerTests, ServerTests_ParseNoBodyDelimiterRequ_Test) {
-    Http::Server server;
+TEST_F(ServerTests, ServerTests_ParseNoBodyDelimiterRequ_Test) {
     size_t messageEnd;
     const std::string rawRequest = ("POST /test HTTP/1.1\r\n"
         "Host: foo.example\r\n"
@@ -246,8 +289,7 @@ TEST(ServerTests, ServerTests_ParseNoBodyDelimiterRequ_Test) {
     ASSERT_TRUE(request == nullptr);
 }
 
-TEST(ServerTests, ServerTests_ParseIncompleteRequestLine_Test) {
-    Http::Server server;
+TEST_F(ServerTests, ServerTests_ParseIncompleteRequestLine_Test) {
     size_t messageEnd;
     const std::string rawRequest = ("POST /test HTTP/1.");
     const auto request = server.ParseRequest(
@@ -257,8 +299,7 @@ TEST(ServerTests, ServerTests_ParseIncompleteRequestLine_Test) {
     ASSERT_TRUE(request == nullptr);
 }
 
-TEST(ServerTests, ServerTests_ParseNoUriRequest_Test) {
-    Http::Server server;
+TEST_F(ServerTests, ServerTests_ParseNoUriRequest_Test) {
     size_t messageEnd;
     const std::string rawRequest = ("POST / HTTP/1.1\r\n"
         "Host: foo.example\r\n"
@@ -270,8 +311,7 @@ TEST(ServerTests, ServerTests_ParseNoUriRequest_Test) {
     ASSERT_TRUE(request == nullptr);
 }
 
-TEST(ServerTests, RequestWithNoContentLengthOrChunkedTransferEncodingHasNoBody) {
-    Http::Server server;
+TEST_F(ServerTests, RequestWithNoContentLengthOrChunkedTransferEncodingHasNoBody) {
     const auto request = server.ParseRequest(
         "GET /hello.txt HTTP/1.1\r\n"
         "User-Agent: curl/7.16.3 libcurl/7.16.3 OpenSSL/0.9.7l zlib/1.2.3\r\n"
@@ -287,8 +327,7 @@ TEST(ServerTests, RequestWithNoContentLengthOrChunkedTransferEncodingHasNoBody) 
     ASSERT_TRUE(request->body.empty());
 }
 
-TEST(ServerTests, ServerTests_ParseInvalidRequestNoTarget_Test) {
-    Http::Server server;
+TEST_F(ServerTests, ServerTests_ParseInvalidRequestNoTarget_Test) {
     size_t messageEnd;
     const std::string rawRequest = (        
         "GET HTTP/1.1\r\n"
@@ -305,8 +344,7 @@ TEST(ServerTests, ServerTests_ParseInvalidRequestNoTarget_Test) {
     ASSERT_EQ(Http::Server::Request::Validity::InvalidRecoverable, request->validity);
 }
 
-TEST(ServerTests, ServerTests_ParseInvalidRequestBadProtocol_Test) {
-    Http::Server server;
+TEST_F(ServerTests, ServerTests_ParseInvalidRequestBadProtocol_Test) {
     size_t messageEnd;
     const std::string rawRequest = (        
         "GET /hello.txt Foo\r\n"
@@ -323,8 +361,7 @@ TEST(ServerTests, ServerTests_ParseInvalidRequestBadProtocol_Test) {
     ASSERT_EQ(Http::Server::Request::Validity::InvalidRecoverable, request->validity);
 }
 
-TEST(ServerTests, ServerTests_ParseInvalidRequestDamageHeader_Test) {
-    Http::Server server;
+TEST_F(ServerTests, ServerTests_ParseInvalidRequestDamageHeader_Test) {
     size_t messageEnd;
     const std::string rawRequest = (        
         "GET /hello.txt HTTP/1.1\r\n"
@@ -341,8 +378,7 @@ TEST(ServerTests, ServerTests_ParseInvalidRequestDamageHeader_Test) {
     ASSERT_EQ(Http::Server::Request::Validity::InvalidRecoverable, request->validity);
 }
 
-TEST(ServerTests, ServerTests_ParseInvalidRequestBodyExtremelyTooLarge_Test) {
-    Http::Server server;
+TEST_F(ServerTests, ServerTests_ParseInvalidRequestBodyExtremelyTooLarge_Test) {
     size_t messageEnd = std::numeric_limits< size_t >::max();
     const std::string rawRequest = (        
             "GET /hello.txt HTTP/1.1\r\n"
@@ -361,8 +397,7 @@ TEST(ServerTests, ServerTests_ParseInvalidRequestBodyExtremelyTooLarge_Test) {
     ASSERT_EQ(0, messageEnd);
 }
 
-TEST(ServerTests, ServerTests_ParseInvalidRequestBodySligntlysTooLarge_Test) {
-    Http::Server server;
+TEST_F(ServerTests, ServerTests_ParseInvalidRequestBodySligntlysTooLarge_Test) {
     size_t messageEnd;
     const std::string rawRequest = (        
         "GET /hello.txt HTTP/1.1\r\n"
@@ -380,32 +415,30 @@ TEST(ServerTests, ServerTests_ParseInvalidRequestBodySligntlysTooLarge_Test) {
     ASSERT_EQ(Http::Server::Request::Validity::InvalidUnrecoverable, request->validity);
 }
 
-TEST(ServerTests, ServerTests_Mobiliz_Test) {
+TEST_F(ServerTests, ServerTests_Mobiliz_Test) {
     auto transport = std::make_shared< MockTransport >();
-    Http::Server server;
     ASSERT_TRUE(server.Mobilize(transport, 1234));
     ASSERT_EQ(1234, transport->port);
     ASSERT_FALSE(transport->connectionDelegate == nullptr);
 }
 
-TEST(ServerTests, ServerTests_Demobilize_Test) {
+TEST_F(ServerTests, ServerTests_Demobilize_Test) {
     auto transport = std::make_shared< MockTransport >();
-    Http::Server server;
     (void)server.Mobilize(transport, 1234);
     server.Demobilize();
     ASSERT_FALSE(transport->bound);
 }
 
-TEST(ServerTests, ServerTests_ReleaseNetworkUponDestruction_Test) {
+TEST_F(ServerTests, ServerTests_ReleaseNetworkUponDestruction_Test) {
     auto transport = std::make_shared< MockTransport >();
     {
-        Http::Server server;
-        (void)server.Mobilize(transport, 1234);
+        Http::Server tmpServer;
+        (void)tmpServer.Mobilize(transport, 1234);
     }
     ASSERT_FALSE(transport->bound);
 }
 
-TEST(ServerTests, Expect404FromClientRequest) {
+TEST_F(ServerTests, Expect404FromClientRequest) {
     auto transport = std::make_shared< MockTransport >();
     Http::Server Server;
     (void)Server.Mobilize(transport, 1234);
@@ -442,26 +475,8 @@ TEST(ServerTests, Expect404FromClientRequest) {
     );
 }
 
-TEST(ServerTests, ServerTests_Expect404FromClientRequestInTwoPieces__Test) {
-    std::vector< std::string > diagnosticMessages; 
+TEST_F(ServerTests, ServerTests_Expect404FromClientRequestInTwoPieces__Test) {
     auto transport = std::make_shared< MockTransport >();
-    Http::Server server;
-    server.SubscribeToDiagnostics(
-        [&diagnosticMessages](
-            std::string senderName,
-            size_t level,
-            std::string message
-        ){
-            diagnosticMessages.push_back(
-                StringUtils::sprintf(
-                    "%s[%zu]: %s",
-                    senderName.c_str(),
-                    level,
-                    message.c_str()
-                )
-            );
-        }
-    );
     (void)server.Mobilize(transport, 1234);
     ASSERT_EQ(
         (std::vector< std::string >{
@@ -525,9 +540,8 @@ TEST(ServerTests, ServerTests_Expect404FromClientRequestInTwoPieces__Test) {
 }
 
 
-TEST(ServerTests, twoClientRequestsInOnePiece) {
+TEST_F(ServerTests, twoClientRequestsInOnePiece) {
     auto transport = std::make_shared< MockTransport >();
-    Http::Server server;
     (void)server.Mobilize(transport, 1234);
     auto connection = std::make_shared< MockConnection >();
     transport->connectionDelegate(connection);
@@ -572,9 +586,8 @@ TEST(ServerTests, twoClientRequestsInOnePiece) {
     );
 }
 
-TEST(ServerTests, ClientInvalidRequestRecoverable) {
+TEST_F(ServerTests, ClientInvalidRequestRecoverable) {
     auto transport = std::make_shared< MockTransport >();
-    Http::Server server;
     (void)server.Mobilize(transport, 1234);
     auto connection = std::make_shared< MockConnection >();
     transport->connectionDelegate(connection);
@@ -610,9 +623,8 @@ TEST(ServerTests, ClientInvalidRequestRecoverable) {
     ASSERT_FALSE(connection->broken);
 }
 
-TEST(ServerTests, ClientInvalidRequestUnrecoverable) {
+TEST_F(ServerTests, ClientInvalidRequestUnrecoverable) {
     auto transport = std::make_shared< MockTransport >();
-    Http::Server server;
     (void)server.Mobilize(transport, 1234);
     auto connection = std::make_shared< MockConnection >();
     transport->connectionDelegate(connection);
@@ -647,4 +659,21 @@ TEST(ServerTests, ClientInvalidRequestUnrecoverable) {
         )
     );
     ASSERT_TRUE(connection->broken);
+}
+
+TEST_F(ServerTests, ServerTests_ClientConnectionBroken_Test) {
+    auto transport = std::make_shared< MockTransport >();
+    (void)server.Mobilize(transport, 1234);
+    auto connection = std::make_shared< MockConnection >();
+    transport->connectionDelegate(connection);
+    ASSERT_FALSE(connection->brokenDelegate == nullptr);
+    diagnosticMessages.clear();
+    connection->brokenDelegate(true);
+    ASSERT_EQ(
+        (std::vector< std::string >{
+            "Http::Server[2]: Connection to mock-client is broken by peer",
+        }),
+        diagnosticMessages
+    );
+    diagnosticMessages.clear();
 }
