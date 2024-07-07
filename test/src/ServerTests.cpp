@@ -24,6 +24,14 @@ namespace {
         // Properies
 
         /**
+         * This indicates whether or not the mock connection is received
+         * from the remote peer.
+         */
+        bool callingDelegate =  false;
+
+        std::recursive_mutex callingDelegateMutex;
+
+        /**
          * This is the delegate to call whenever data is received from
          * the remote peer.
          */
@@ -45,7 +53,22 @@ namespace {
          */
         bool broken = false;
 
+        // Lifecycle management
+        ~MockConnection() {
+            std::lock_guard< decltype(callingDelegateMutex) > lock(callingDelegateMutex);
+            if (callingDelegate) {
+                *((int*)0) = 42; //force a crash (use in a death test)
+            }
+        }
+
+        MockConnection(const MockConnection&) = delete;
+        MockConnection(MockConnection&&) = delete;
+        MockConnection& operator=(const MockConnection&) = delete;
+        MockConnection& operator=(MockConnection&&) = delete;
+
         // Methods
+
+        MockConnection() = default;
 
         // Http::Connection
 
@@ -676,4 +699,20 @@ TEST_F(ServerTests, ServerTests_ClientConnectionBroken_Test) {
         diagnosticMessages
     );
     diagnosticMessages.clear();
+}
+
+TEST_F(ServerTests, ClientShouldNotBeRaleasedDuringBreakDelegateCall) {
+    auto transport = std::make_shared< MockTransport >();
+    (void)server.Mobilize(transport, 1234);
+    auto connection = std::make_shared< MockConnection >();
+    transport->connectionDelegate(connection);
+    auto connectionRaw = connection.get();
+    connection = nullptr;
+    {
+        std::lock_guard< decltype(connectionRaw->callingDelegateMutex) > lock(connectionRaw->callingDelegateMutex);
+        connectionRaw->callingDelegate = true;
+        connectionRaw->brokenDelegate(true);
+        connectionRaw->callingDelegate = false;
+    }
+    
 }
