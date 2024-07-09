@@ -469,9 +469,18 @@ namespace Http {
         // First, extarct the request line.
         const auto requestLineEnd = rawRequest.find(CRLF);
         if (requestLineEnd == std::string::npos) {
+            if (rawRequest.length() > impl_->headerLineLimit) {
+                request->validity = Request::Validity::InvalidUnrecoverable;
+                return request;
+            }
             return nullptr;
         }
-        const auto requestLine = rawRequest.substr(0, requestLineEnd);
+        const auto requestLineLength = requestLineEnd;
+        if (requestLineLength > impl_->headerLineLimit) {
+            request->validity = Request::Validity::InvalidUnrecoverable;
+            return request;
+        }
+        const auto requestLine = rawRequest.substr(0, requestLineLength);
         if (!ParseRequestLine(request, requestLine)) {
             request->validity = Request::Validity::InvalidRecoverable;
         }
