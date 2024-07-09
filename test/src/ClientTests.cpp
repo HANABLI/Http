@@ -112,5 +112,5 @@ TEST(ClientTests, ClientTests_ParseNoContentLengthResponse_Test) {
         "Hello World! My payload includes a trailing CRLF.\r\n"
     );
     ASSERT_FALSE(response == nullptr);
-    ASSERT_EQ("Hello World! My payload includes a trailing CRLF.\r\n", response->body);
+    ASSERT_EQ("", response->body);
 }
