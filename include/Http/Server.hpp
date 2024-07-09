@@ -91,7 +91,33 @@ namespace Http {
         */
         Server();
 
-                /**
+        /**
+         * This method returns the value of a given server configuration
+         * item.
+         * 
+         * @param[in] key
+         *      this is the key identifier of the configuration item
+         *      whose value should be returned.
+         * 
+         * @return
+         *      The value of the configuration item is returned.
+         */
+        std::string GetConfigurationItem(const std::string& key);
+        
+        /**
+         * This method sets the value of the given server configuration 
+         * item.
+         * 
+         * 
+         * @param[in] key
+         *      This is the key identifier of the configuration server
+         *      item whose value should be set.
+         * @param[in] value
+         *      This is the value to be set for the configuration item
+         */
+        void SetConfigurationItem(const std::string& key, const std::string& value);
+
+        /**
         * This method forms a new subscription to diagnostic
         * messages published by the sender.
         * 
@@ -149,7 +175,7 @@ namespace Http {
          * @retval nullptr
          *      This is returned if the given rawRequest did not parse correctly.
          */
-        static std::shared_ptr< Request > ParseRequest(const std::string& rawRequest);
+        std::shared_ptr< Request > ParseRequest(const std::string& rawRequest);
 
         /**
          * This method parces the given string as a raw Http request message.
@@ -169,7 +195,7 @@ namespace Http {
          * @retval nullptr
          *      This is returned if the given rawRequest is incomplete or did not parse correctly.
          */
-        static std::shared_ptr< Request > ParseRequest(const std::string& rawRequest, size_t& messageEnd);
+        std::shared_ptr< Request > ParseRequest(const std::string& rawRequest, size_t& messageEnd);
 
 
 

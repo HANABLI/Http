@@ -438,6 +438,34 @@ TEST_F(ServerTests, ServerTests_ParseInvalidRequestBodySligntlysTooLarge_Test) {
     ASSERT_EQ(Http::Server::Request::Validity::InvalidUnrecoverable, request->validity);
 }
 
+TEST_F(ServerTests, ParseValideHeaderLineLongerThanDefault) {
+    size_t messageEnd;
+    const std::string testHeaderName("X-Poggers");
+    const std::string testHeaderNameWithDelimiters = testHeaderName + ": ";
+    const std::string valueIsTooLong(999 - testHeaderNameWithDelimiters.length(), 'X');
+    const std::string rawRequest = (
+        "GET /hello.txt HTTP/1.1\r\n"
+        "User-Agent: curl/7.16.3 libcurl/7.16.3 OpenSSL/0.9.7l zlib/1.2.3\r\n"
+        + testHeaderNameWithDelimiters + valueIsTooLong + "\r\n"
+        "Host: www.example.com\r\n"
+        "Accept-Language: en, mi\r\n"
+        "\r\n"
+    );
+    ASSERT_EQ("1000", server.GetConfigurationItem("HeaderLineLimit"));
+    server.SetConfigurationItem("HeaderLineLimit", "1001");
+    ASSERT_EQ(
+        (std::vector< std::string >{
+            "Http::Server[0]: Header line limit changed from 1000 to 1001",
+             }),
+        diagnosticMessages
+    );
+    diagnosticMessages.clear();
+    ASSERT_EQ("1001", server.GetConfigurationItem("HeaderLineLimit"));
+    const auto request = server.ParseRequest(rawRequest, messageEnd);
+    ASSERT_FALSE(request == nullptr);
+    ASSERT_EQ(Http::Server::Request::Validity::Valid, request->validity);
+}
+
 TEST_F(ServerTests, ServerTests_Mobiliz_Test) {
     auto transport = std::make_shared< MockTransport >();
     ASSERT_TRUE(server.Mobilize(transport, 1234));

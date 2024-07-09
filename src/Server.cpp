@@ -8,7 +8,9 @@
  */
 
 #include <set>
+#include <map>
 #include <inttypes.h>
+#include <StringUtils/StringUtils.hpp>
 #include <string>
 #include <Http/Server.hpp>
 #include <condition_variable>
@@ -32,7 +34,7 @@ namespace {
     /**
      * This is the maximum allowed request header line size.
      */
-    constexpr size_t HEADER_LINE_LIMIT = 1000;
+    constexpr size_t DEFAULT_HEADER_LINE_LIMIT = 1000;
 
     /**
      * @return 
@@ -135,6 +137,9 @@ namespace {
          * This method appends the given data to the end of the concatenate
          * buffer, and then attempts to parse a request out of it.
          * 
+         * @param[in] server
+         *      This is the server that has this connection.
+         * 
          * @return 
          *      The request parsed from the concatenate buffer is returned.
          * 
@@ -142,9 +147,11 @@ namespace {
          *      This is returned if no request could be parsed from the 
          *      concatinate buffer
          */
-        std::shared_ptr< Http::Server::Request > TryRequestAssembly() {
+        std::shared_ptr< Http::Server::Request > TryRequestAssembly(
+            Http::Server* server
+        ) {
             size_t messageEnd;
-            const auto request = Http::Server::ParseRequest(
+            const auto request = server->ParseRequest(
                 concatenateBuffer,
                 messageEnd
             );
@@ -171,6 +178,22 @@ namespace Http {
 
     struct Server::Impl
     {
+
+        /**
+         * This is the pointer to the server who own the connection.
+         */
+        Server* server = nullptr;
+
+        /**
+         * this holds configuration items of the server.
+         */
+        std::map< std::string, std::string> configuration;
+
+        /**
+         * This is the header line limit parameter
+         */
+        size_t headerLineLimit = DEFAULT_HEADER_LINE_LIMIT;
+
         /**
          * This is the transport layer currently bound.
          */
@@ -269,7 +292,7 @@ namespace Http {
         ) {
             connectionState->concatenateBuffer += std::string(data.begin(), data.end());
             for (;;) {
-                const auto request = connectionState->TryRequestAssembly();
+                const auto request = connectionState->TryRequestAssembly(server);
                 if (request == nullptr) {
                     break;
                 }
@@ -392,7 +415,40 @@ namespace Http {
 
     Server::Server()
          : impl_(new Impl) {
+            impl_->server = this;
+            impl_->configuration["HeaderLineLimit"] = StringUtils::sprintf("%zu", DEFAULT_HEADER_LINE_LIMIT);
             impl_->reaper = std::thread(&Impl::Reaper, impl_.get());
+    }
+
+    std::string Server::GetConfigurationItem(const std::string& key){
+        const auto entry = impl_->configuration.find(key);
+        if (entry == impl_->configuration.end()) {
+            return "";
+        } else {
+            return entry->second;
+        }
+    }
+
+    void Server::SetConfigurationItem(const std::string& key, const std::string& value) {
+        impl_->configuration[key] = value;
+        if (key == "HeaderLineLimit") {
+            size_t newHeaderLineLimit;
+            if (
+                sscanf(
+                    value.c_str(),
+                    "%zu",
+                    &newHeaderLineLimit
+                ) == 1
+            ) {
+                impl_->diagnosticsSender.SendDiagnosticInformationFormatted(
+                    0,
+                    "Header line limit changed from %zu to %zu",
+                    impl_->headerLineLimit,
+                    newHeaderLineLimit
+                );
+                impl_->headerLineLimit = newHeaderLineLimit;
+            }
+        }
     }
 
     SystemUtils::DiagnosticsSender::UnsubscribeDelegate Server::SubscribeToDiagnostics(
@@ -422,7 +478,7 @@ namespace Http {
         //Second, parse the message headers and identify where the body begins.
         size_t bodyOffset = 0;
         const auto headerOffset = requestLineEnd + CRLF.length();
-        request->headers.SetLineLimit(HEADER_LINE_LIMIT);
+        request->headers.SetLineLimit(impl_->headerLineLimit);
         switch (
             request->headers
                 .ParseRawMessage(
