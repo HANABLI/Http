@@ -29,21 +29,59 @@ namespace Http {
          */
         struct Request
         {
+            // Types
+
             /**
-             * These are the different validity states 
-             * that a request can have.
+             * This type is used to track how much of the next request
+             * has been parsed so far.
              */
-            enum class Validity {
+            enum class RequestParsingState {
+                /**
+                 * In this state, we're still waiting to receive
+                 * the full request line.
+                 */
+                RequestLine,
 
-                Valid, ///< request parsed successfully
+                /**
+                 * In this state, we're received and parsed the request
+                 * line, and possibly some header lines, but haven't yet
+                 * received all of the header lines.
+                 */
+                Headers,
 
-                ValidIncomplete,
+                /**
+                 * in this state, we've received and parsed the request
+                 * line and headers, and possibly some of the body, but
+                 * haven't yet received all of the body.
+                 */
+                Body,
+                
+                /**
+                 * In this state, the request is fully constructed
+                 * and has passed all validity chacks.
+                 */
+                Complete, ///< request parsed successfully
 
+                /**
+                 * In this state, the request is fully constructed,
+                 * but fails one or more validity checks, in such
+                 * a way that it should not cause the connection
+                 * from which it was constructed to be closed.
+                 */
                 InvalidRecoverable, ///< bad request but server can keep connection
 
+                /**
+                 * In this state, the request is fully constructed,
+                 * but fails one or more validity checks, in such
+                 * a way that the connection from which it was
+                 * constructed should be closed, either for security
+                 * reasons, or because it would be impossible or unlikely
+                 * to receive a valid request after this one.
+                 */
                 InvalidUnrecoverable ///< bad request, server should close connection
 
             };
+
             /**
              * This is the request method to be performed on the
              * target resource.
@@ -72,7 +110,14 @@ namespace Http {
              * was parced correctly. connection can still be used in some
              * invalidity cases.
              */
-            Validity validity = Validity::Valid;
+            RequestParsingState state = RequestParsingState::RequestLine;
+
+            // Methods
+            /**
+             * This method returns an indication of whether or not the request
+             * has been fully constructed (valid or not).
+             */
+            bool IsComplete() const;
         };
         
 
@@ -161,7 +206,7 @@ namespace Http {
         void Demobilize();
 
         /**
-         * This method parces the given string as a raw Http request message.
+         * This method parses the given string as a raw Http request message.
          * If the string parses correctly, the equivalent Request is returned.
          * otherwise, nullptr is returned.
          * 
@@ -178,7 +223,7 @@ namespace Http {
         std::shared_ptr< Request > ParseRequest(const std::string& rawRequest);
 
         /**
-         * This method parces the given string as a raw Http request message.
+         * This method parses the given string as a raw Http request message.
          * If the string parses correctly, the equivalent Request is returned.
          * otherwise, nullptr is returned.
          * 
@@ -219,14 +264,15 @@ namespace Http {
      * This is a support function for googleTest to print out
      * values of the Server::Request::Validity class.
      * 
-     * @param[in] validity
-     *      This is the validity to print out.
+     * @param[in] state
+     *      This is the request state to print out.
      * 
      * @param[in] os
-     *      This is a pointer to the stream to wish to print the validity.
+     *      This is a pointer to the stream to wish to print 
+     *      the request state.
      */
     void PrintTo(
-        const Server::Request::Validity& validity,
+        const Server::Request::RequestParsingState& state,
         std::ostream* os
     );
 }

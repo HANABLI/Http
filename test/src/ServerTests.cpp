@@ -200,7 +200,7 @@ TEST_F(ServerTests, ServerTests_ParseGetRequest_Test) {
         "\r\n"
     );
     ASSERT_FALSE(request == nullptr);
-    ASSERT_EQ(request->validity, Http::Server::Request::Validity::Valid);
+    ASSERT_EQ(request->state, Http::Server::Request::RequestParsingState::Complete);
     Uri::Uri expectedUri;
     expectedUri.ParseFromString("/hello.txt");
     ASSERT_EQ("GET", request->method);
@@ -254,7 +254,7 @@ TEST_F(ServerTests, ServerTests_ParseInvalidRequestNoMethod_Test) {
         messageEnd
     );
     ASSERT_FALSE(request == nullptr);
-    ASSERT_EQ(Http::Server::Request::Validity::InvalidRecoverable, request->validity);
+    ASSERT_EQ(Http::Server::Request::RequestParsingState::InvalidRecoverable, request->state);
 }
 
 TEST_F(ServerTests, ServerTests_ParseIncompleteBodyRequ_Test) {
@@ -345,7 +345,7 @@ TEST_F(ServerTests, RequestWithNoContentLengthOrChunkedTransferEncodingHasNoBody
         "Hello, World\r\n"
     );
     ASSERT_FALSE(request == nullptr);
-    ASSERT_EQ(request->validity, Http::Server::Request::Validity::Valid);
+    ASSERT_EQ(request->state, Http::Server::Request::RequestParsingState::Complete);
     Uri::Uri expectedUri;
     expectedUri.ParseFromString("/hello.txt");
     ASSERT_TRUE(request->body.empty());
@@ -365,7 +365,7 @@ TEST_F(ServerTests, ServerTests_ParseInvalidRequestNoTarget_Test) {
         messageEnd
     );
     ASSERT_FALSE(request == nullptr);
-    ASSERT_EQ(Http::Server::Request::Validity::InvalidRecoverable, request->validity);
+    ASSERT_EQ(Http::Server::Request::RequestParsingState::InvalidRecoverable, request->state);
 }
 
 TEST_F(ServerTests, ServerTests_ParseInvalidRequestBadProtocol_Test) {
@@ -382,7 +382,7 @@ TEST_F(ServerTests, ServerTests_ParseInvalidRequestBadProtocol_Test) {
         messageEnd
     );
     ASSERT_FALSE(request == nullptr);
-    ASSERT_EQ(Http::Server::Request::Validity::InvalidRecoverable, request->validity);
+    ASSERT_EQ(Http::Server::Request::RequestParsingState::InvalidRecoverable, request->state);
 }
 
 TEST_F(ServerTests, ServerTests_ParseInvalidRequestDamageHeader_Test) {
@@ -399,7 +399,7 @@ TEST_F(ServerTests, ServerTests_ParseInvalidRequestDamageHeader_Test) {
         messageEnd
     );
     ASSERT_FALSE(request == nullptr);
-    ASSERT_EQ(Http::Server::Request::Validity::InvalidRecoverable, request->validity);
+    ASSERT_EQ(Http::Server::Request::RequestParsingState::InvalidRecoverable, request->state);
 }
 
 TEST_F(ServerTests, ServerTests_ParseInvalidRequestBodyExtremelyTooLarge_Test) {
@@ -417,7 +417,7 @@ TEST_F(ServerTests, ServerTests_ParseInvalidRequestBodyExtremelyTooLarge_Test) {
         messageEnd
     );
     ASSERT_FALSE(request == nullptr);
-    ASSERT_EQ(Http::Server::Request::Validity::InvalidUnrecoverable, request->validity);
+    ASSERT_EQ(Http::Server::Request::RequestParsingState::InvalidUnrecoverable, request->state);
     ASSERT_EQ(0, messageEnd);
 }
 
@@ -436,7 +436,7 @@ TEST_F(ServerTests, ServerTests_ParseInvalidRequestBodySligntlysTooLarge_Test) {
         messageEnd
     );
     ASSERT_FALSE(request == nullptr);
-    ASSERT_EQ(Http::Server::Request::Validity::InvalidUnrecoverable, request->validity);
+    ASSERT_EQ(Http::Server::Request::RequestParsingState::InvalidUnrecoverable, request->state);
 }
 
 TEST_F(ServerTests, ParseValideHeaderLineLongerThanDefault) {
@@ -464,7 +464,7 @@ TEST_F(ServerTests, ParseValideHeaderLineLongerThanDefault) {
     ASSERT_EQ("1001", server.GetConfigurationItem("HeaderLineLimit"));
     const auto request = server.ParseRequest(rawRequest, messageEnd);
     ASSERT_FALSE(request == nullptr);
-    ASSERT_EQ(Http::Server::Request::Validity::Valid, request->validity);
+    ASSERT_EQ(Http::Server::Request::RequestParsingState::Complete, request->state);
 }
 
 TEST_F(ServerTests, ServerTests_Mobiliz_Test) {
@@ -753,7 +753,7 @@ TEST_F(ServerTests, ParseInvalidRequestLineTooLong) {
     );
     const auto request = server.ParseRequest(rawRequest, messageEnd);
     ASSERT_FALSE(request == nullptr);
-    ASSERT_EQ(Http::Server::Request::Validity::InvalidUnrecoverable, request->validity);
+    ASSERT_EQ(Http::Server::Request::RequestParsingState::InvalidUnrecoverable, request->state);
 }
 
 TEST_F(ServerTests, ConnectionCloseOrNot) {
