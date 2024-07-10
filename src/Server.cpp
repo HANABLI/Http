@@ -526,12 +526,15 @@ namespace Http {
         // Check for "Host" header
         if (request->headers.HasHeader("Host")) {
             const auto requestHost = request->headers.GetHeaderValue("Host");
-            auto serverHost = requestHost; // TODO: get from configuration
+            auto serverHost = impl_->configuration["Host"];
+            if (serverHost.empty()) {
+                serverHost = requestHost;
+            }
             auto targetHost = request->target.GetHost();
             if (targetHost.empty()) {
                 targetHost = serverHost;
             }
-            if (requestHost != targetHost) {
+            if ((requestHost != targetHost) || (requestHost != serverHost)) {
                 request->validity = Request::Validity::InvalidRecoverable;
                 return request;
             }

@@ -818,6 +818,7 @@ TEST_F(ServerTests, ServerTests_HostMissing_Test) {
 }
 
 TEST_F(ServerTests, ServerTests_HostNotMatchingTargetUri_Test) {
+    
     auto transport = std::make_shared< MockTransport >();
     (void)server.Mobilize(transport, 1234);
     auto connection = std::make_shared< MockConnection >();
@@ -844,5 +845,91 @@ TEST_F(ServerTests, ServerTests_HostNotMatchingTargetUri_Test) {
     );
     ASSERT_FALSE(response == nullptr);
     ASSERT_EQ(400, response->statusCode);
+}
+
+TEST_F(ServerTests, ServerTests_HostNotMatchingServerUri_Test) {
+    ASSERT_EQ("", server.GetConfigurationItem("Host"));
+    server.SetConfigurationItem("Host", "www.example.com");
+    struct TestVector
+    {
+        std::string hostUri;
+        bool badRequestStatusExpected;
+    };
+    std::vector< TestVector > testVectors{
+        {"www.example.com", false},
+        {"bad.example.com", true}
+    };
+    size_t index = 0;
+    for (const auto& testVector: testVectors) {
+        auto transport = std::make_shared< MockTransport >();
+        (void)server.Mobilize(transport, 1234);
+        auto connection = std::make_shared< MockConnection >();
+        transport->connectionDelegate(connection);
+        const std::string request(
+            "GET http://www.example.com/hello.txt HTTP/1.1\r\n"
+            "User-Agent: curl/7.16.3 libcurl/7.16.3 OpenSSL/0.9.7l zlib/1.2.3\r\n"
+            "Host: " + testVector.hostUri + "\r\n"
+            "Accept-Language: en, mi\r\n"
+            "\r\n"
+        );
+        connection->dataReceivedDelegate(   
+            std::vector< uint8_t >(
+                request.begin(),
+                request.end()
+            )
+        );
+        Http::Client client;
+        const auto response = client.ParseResponse(
+            std::string(
+                connection->dataReceived.begin(),
+                connection->dataReceived.end()
+            )
+        );
+        ASSERT_FALSE(response == nullptr);
+        if (testVector.badRequestStatusExpected) {
+            EXPECT_EQ(400, response->statusCode) << "Fail for test vector index" << index;
+        } else {
+            EXPECT_NE(400, response->statusCode) << "Fail for test vector index" << index;
+        }
+        index++;
+    }
+}
+
+TEST_F(ServerTests, ServerTests_DefaultServerUri_Test) {
+    ASSERT_EQ("", server.GetConfigurationItem("Host"));
+    const std::vector< std::string > testVectors{
+        "www.example.com",
+        "bad.example.com"
+    };
+    size_t index = 0;
+    for (const auto testVector: testVectors) { 
+        auto transport = std::make_shared< MockTransport >();
+        (void)server.Mobilize(transport, 1234);
+        auto connection = std::make_shared< MockConnection >();
+        transport->connectionDelegate(connection);
+        const std::string request(
+            "GET /hello.txt HTTP/1.1\r\n"
+            "User-Agent: curl/7.16.3 libcurl/7.16.3 OpenSSL/0.9.7l zlib/1.2.3\r\n"
+            "Host: " + testVector + "\r\n"
+            "Accept-Language: en, mi\r\n"
+            "\r\n"
+        );
+        connection->dataReceivedDelegate(   
+            std::vector< uint8_t >(
+                request.begin(),
+                request.end()
+            )
+        );
+        Http::Client client;
+        const auto response = client.ParseResponse(
+            std::string(
+                connection->dataReceived.begin(),
+                connection->dataReceived.end()
+            )
+        );
+        ASSERT_FALSE(response == nullptr);
+        EXPECT_NE(400, response->statusCode) << "Failed for test viector index" << index;
+        index++;
+    }
 }
 
