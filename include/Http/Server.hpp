@@ -58,29 +58,26 @@ namespace Http {
                 
                 /**
                  * In this state, the request is fully constructed
-                 * and has passed all validity chacks.
+                 * or is invalid, but the connection from which the request
+                 * was constructed can remain open to accept another request.
                  */
                 Complete, ///< request parsed successfully
 
                 /**
-                 * In this state, the request is fully constructed,
-                 * but fails one or more validity checks, in such
-                 * a way that it should not cause the connection
-                 * from which it was constructed to be closed.
-                 */
-                InvalidRecoverable, ///< bad request but server can keep connection
-
-                /**
-                 * In this state, the request is fully constructed,
-                 * but fails one or more validity checks, in such
-                 * a way that the connection from which it was
+                 * In this state, connection from which the request was
                  * constructed should be closed, either for security
                  * reasons, or because it would be impossible or unlikely
                  * to receive a valid request after this one.
                  */
-                InvalidUnrecoverable ///< bad request, server should close connection
+                Error ///< bad request, server should close connection
 
             };
+
+            /**
+             * This flag indicates whether or not the request 
+             * has passed all validity steps.
+             */
+            bool valid = true;
 
             /**
              * This is the request method to be performed on the
@@ -116,8 +113,12 @@ namespace Http {
             /**
              * This method returns an indication of whether or not the request
              * has been fully constructed (valid or not).
+             * 
+             * @return
+             *      An indication of whether or not the request
+             *      has been fully constructed is returned.
              */
-            bool IsComplete() const;
+            bool IsProcessed() const;
         };
         
 
