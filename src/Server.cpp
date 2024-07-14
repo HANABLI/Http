@@ -362,13 +362,11 @@ namespace Http {
                                 targetHost = serverHost;
                             }
                             if ((requestHost != targetHost) || (requestHost != serverHost)) {
-                                request->state = Request::RequestParsingState::Error;
-                                return messageEnd;
+                                request->valid = false;
                             }
                             // TODO: check that target host matches server host.
                         } else {
-                            request->state = Request::RequestParsingState::Error;
-                            return messageEnd;
+                            request->valid = false;
                         }
                     } break;
 

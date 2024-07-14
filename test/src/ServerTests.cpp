@@ -905,6 +905,7 @@ TEST_F(ServerTests, ServerTests_HostNotMatchingServerUri_Test) {
         } else {
             EXPECT_NE(400, response->statusCode) << "Fail for test vector index" << index;
         }
+        ASSERT_FALSE(connection->broken) << "Failed for test vector index" << index;
         index++;
     }
 }
