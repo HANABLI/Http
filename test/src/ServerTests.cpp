@@ -948,3 +948,76 @@ TEST_F(ServerTests, ServerTests_DefaultServerUri_Test) {
     }
 }
 
+TEST_F(ServerTests, ServerTests_RegisterResourceDelegate__Test) {
+    auto transport = std::make_shared< MockTransport >();
+    (void)server.Mobilize(transport, 1234);
+    auto connection = std::make_shared < MockConnection >();
+    transport->connectionDelegate(connection);
+
+    const std::string request = (
+        "GET /foo/bar HTTP/1.1\r\n"
+        "Host: www.exemple.com\r\n"
+        "\r\n"
+    );
+    connection->dataReceivedDelegate(
+        std::vector< uint8_t >(
+            request.begin(),
+            request.end()
+        )
+    );
+    Http::Client client;
+    auto response = client.ParseResponse(
+        std::string(
+            connection->dataReceived.begin(),
+            connection->dataReceived.end()
+        )
+    );
+    EXPECT_EQ(404, response->statusCode);
+    connection->dataReceived.clear();
+
+    std::vector< Uri::Uri > RequestsResived;
+    const auto resourceDelegate = [&RequestsResived](
+        std::shared_ptr< Http::Server::Request > request
+    ){
+        const auto response = std::make_shared< Http::Client::Response >();
+        RequestsResived.push_back(request->target);
+        return response;
+    };
+    const auto unregistrationDelegate = server.RegisterResource({"foo"}, resourceDelegate);
+    ASSERT_TRUE(RequestsResived.empty());
+    connection->dataReceivedDelegate(
+        std::vector< uint8_t >(
+            request.begin(),
+            request.end()
+        )
+    );
+    response = client.ParseResponse(
+        std::string(
+            connection->dataReceived.begin(),
+            connection->dataReceived.end()
+        )
+    );
+   
+    EXPECT_EQ(200, response->statusCode);
+    ASSERT_EQ(1, RequestsResived.size());
+    ASSERT_EQ(
+        (std::vector< std::string >{ "bar" }),
+        RequestsResived[0].GetPath()
+    );
+    connection->dataReceived.clear();
+    unregistrationDelegate();
+    connection->dataReceivedDelegate(
+        std::vector< uint8_t >(
+            request.begin(),
+            request.end()
+        )
+    );
+    response = client.ParseResponse(
+        std::string(
+            connection->dataReceived.begin(),
+            connection->dataReceived.end()
+        )
+    );
+    EXPECT_EQ(404, response->statusCode);
+    connection->dataReceived.clear();
+}
