@@ -53,6 +53,18 @@ namespace Http {
              */
             std::string body;
 
+            //Methods
+
+            /**
+             * This method generates the data to transmit to the client
+             * to return this response to the client 
+             * 
+             * @return
+             *      The data to transmit to the client to return this 
+             *      response to the client is returned 
+             */
+            std::string GenerateToString() const;
+
         };
         
     public:
@@ -105,6 +117,10 @@ namespace Http {
          *      This is returned if the given rawResponse did not parse correctly.
          */
         std::shared_ptr< Response > ParseResponse(const std::string& rawResponse, size_t& messageEnd);
+
+        /**
+         * 
+         */
 
 
     private:

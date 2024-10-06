@@ -114,3 +114,32 @@ TEST(ClientTests, ClientTests_ParseNoContentLengthResponse_Test) {
     ASSERT_FALSE(response == nullptr);
     ASSERT_EQ("", response->body);
 }
+
+TEST(ClientTests, ClientTests_ResponseToString_Test) {
+    Http::Client::Response response;
+    response.statusCode = 200;
+    response.reasonPhrase = "OK";
+    response.headers.AddHeader("Date", "Mon, 27 Jul 2009 12:28:53 GMT");
+    response.headers.AddHeader("Server", "Apache");
+    response.headers.AddHeader("Last-Modified", "Wed, 22 Jul 2009 19:15:56 GMT");
+    response.headers.AddHeader("ETag", "\"34aa387-d-1568eb00\"");
+    response.headers.AddHeader("Accept-Ranges", "bytes");
+    response.headers.AddHeader("Content-Length", "51");
+    response.headers.AddHeader("Vary", "Accept-Encoding");
+    response.headers.AddHeader("Content-Type", "text/plain");
+    response.body = "Hello World! My payload includes a trailing CRLF.\r\n";
+    ASSERT_EQ(
+        "HTTP/1.1 200 OK\r\n"
+        "Date: Mon, 27 Jul 2009 12:28:53 GMT\r\n"
+        "Server: Apache\r\n"
+        "Last-Modified: Wed, 22 Jul 2009 19:15:56 GMT\r\n"
+        "ETag: \"34aa387-d-1568eb00\"\r\n"  
+        "Accept-Ranges: bytes\r\n"
+        "Content-Length: 51\r\n"
+        "Vary: Accept-Encoding\r\n"
+        "Content-Type: text/plain\r\n"
+        "\r\n"
+        "Hello World! My payload includes a trailing CRLF.\r\n", 
+        response.GenerateToString()
+    );    
+}

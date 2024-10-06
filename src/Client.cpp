@@ -7,6 +7,8 @@
  * © 2024 by Hatem Nabli
  */
 
+#include <string>
+#include <sstream>
 #include <Http/Client.hpp>
 #include <StringUtils/StringUtils.hpp>
 
@@ -178,6 +180,14 @@ namespace Http {
         }
 
         return response;
+    }
+
+    std::string Client::Response::GenerateToString() const {
+        std::ostringstream builder;
+        builder << "HTTP/1.1 " << statusCode << ' ' << reasonPhrase << "\r\n";
+        builder << headers.GenerateRawHeaders();
+        builder << body;
+        return builder.str();
     }
 
 }
