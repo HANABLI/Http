@@ -31,12 +31,6 @@ namespace Http {
             unsigned int statusCode;
 
             /**
-            * This is the human-readable text that describes
-            * the overall status of the request.
-            */
-            std::string reasonPhrase;
-
-            /**
              * This is the human-readable text that describes
              * the overall status of the Response.
              */

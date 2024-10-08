@@ -184,7 +184,7 @@ namespace Http {
 
     std::string Client::Response::GenerateToString() const {
         std::ostringstream builder;
-        builder << "HTTP/1.1 " << statusCode << ' ' << reasonPhrase << "\r\n";
+        builder << "HTTP/1.1 " << statusCode << ' ' << status << "\r\n";
         builder << headers.GenerateRawHeaders();
         builder << body;
         return builder.str();

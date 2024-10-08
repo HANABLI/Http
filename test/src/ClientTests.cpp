@@ -118,7 +118,7 @@ TEST(ClientTests, ClientTests_ParseNoContentLengthResponse_Test) {
 TEST(ClientTests, ClientTests_ResponseToString_Test) {
     Http::Client::Response response;
     response.statusCode = 200;
-    response.reasonPhrase = "OK";
+    response.status = "OK";
     response.headers.AddHeader("Date", "Mon, 27 Jul 2009 12:28:53 GMT");
     response.headers.AddHeader("Server", "Apache");
     response.headers.AddHeader("Last-Modified", "Wed, 22 Jul 2009 19:15:56 GMT");

@@ -477,7 +477,7 @@ namespace Http {
                 }
                 std::string responseText;
                 unsigned int statusCode;
-                std::string reasonPhrase;
+                std::string status;
                 if (
                     (request->state == Request::RequestParsingState::Complete)
                     && request->valid
@@ -521,7 +521,7 @@ namespace Http {
                         const auto response = resource->handler(request);
                         responseText = response->GenerateToString();
                         statusCode = response->statusCode;
-                        reasonPhrase = response->reasonPhrase;
+                        status = response->status;  
                     } else {
                         const std::string cannedResponse = (
                             "HTTP/1.1 404 Not Found\r\n"
@@ -532,7 +532,7 @@ namespace Http {
                         );
                         responseText = cannedResponse;
                         statusCode = 404;
-                        reasonPhrase = "Not Found";
+                        status = "Not Found";
                     }    
                 } else {
                     const std::string cannedResponse = (
@@ -544,7 +544,7 @@ namespace Http {
                     );
                     responseText = cannedResponse;
                     statusCode = 400;
-                    reasonPhrase = "Bad Request";
+                    status = "Bad Request";
                 }
 
                 connectionState->connection->SendData(
@@ -557,7 +557,7 @@ namespace Http {
                     1,
                     "Sent %u '%s' response back to %s",
                     statusCode,
-                    reasonPhrase.c_str(),
+                    status.c_str(),
                     connectionState->connection->GetPeerId().c_str()
                 );
                 if (request->state == Request::RequestParsingState::Complete) {
