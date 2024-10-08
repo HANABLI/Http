@@ -510,7 +510,7 @@ namespace Http {
                             break;
                         } else {
                             resource = subspaceEntry->second;
-                            (void)resourcePath.pop_front();
+                            resourcePath.pop_front();
                         }
                     }
                     if (
@@ -712,10 +712,13 @@ namespace Http {
             const std::vector< std::string >& resourceSubspacePath, 
             ResourceDelegate resourceDelegate
     ) -> UnregistrationDelegate {
-        std::shared_ptr< ResourceSpace > space = nullptr;
+        std::shared_ptr< ResourceSpace > space =  impl_->resources;
+        if (space == nullptr) {
+            space = impl_->resources = std::make_shared< ResourceSpace >();
+        }
         for (const auto& pathSegment: resourceSubspacePath) {
-            if (space == nullptr) {
-                space = impl_->resources = std::make_shared< ResourceSpace >();
+            if (space->handler != nullptr) {
+                return nullptr;
             }
             std::shared_ptr< ResourceSpace > subspace;
             auto subspacesEntry = space->subspaces.find(pathSegment);
@@ -728,19 +731,31 @@ namespace Http {
             }
             space = subspace;
         }
-        if (space->handler == nullptr) {
+        if (
+            space->handler == nullptr
+            && (space->subspaces.empty())
+        ) {
             space->handler = resourceDelegate;
             return [this, space]{
                 auto currentSpace = space;
+                currentSpace->handler = nullptr;
                 for (;;) {
                     auto superspace = currentSpace->superspace.lock();
-                    if (superspace == nullptr) {
-                        impl_->resources = nullptr;
-                        break;
-                    } else {
-                        (void)superspace->subspaces.erase(currentSpace->name);
+                    if (
+                        (currentSpace->handler == nullptr)
+                        && currentSpace->subspaces.empty()
+                    ) {
+                        if (superspace == nullptr) {
+                            impl_->resources = nullptr;
+                            break;
+                        } else {
+                            (void)superspace->subspaces.erase(currentSpace->name);
+                        }
                     }
-                    if (superspace->subspaces.empty()) {
+                    if ( 
+                        (superspace != nullptr) 
+                        && superspace->subspaces.empty()
+                    ) {
                         currentSpace = superspace;
                     } else {
                         break;
