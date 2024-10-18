@@ -7,6 +7,7 @@ cmake_minimum_required(VERSION 3.8)
 set(this Http)
 
 set(Headers 
+    include/Http/IServer.hpp
     include/Http/Server.hpp
     include/Http/Client.hpp
     include/Http/Connection.hpp
