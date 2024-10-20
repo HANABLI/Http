@@ -519,6 +519,16 @@ namespace Http {
                     ) {
                         request->target.SetPath({resourcePath.begin(), resourcePath.end()});
                         const auto response = resource->handler(request);
+                        if(
+                            !response->headers.HasHeader("Transfer-Encoding")
+                            && !response->body.empty()
+                            && !response->headers.HasHeader("Content-Length")
+                        ) {
+                            response->headers.AddHeader(
+                                "Content-Length",
+                                StringUtils::sprintf("%zu", response->body.length())
+                            );
+                        }
                         responseText = response->GenerateToString();
                         statusCode = response->statusCode;
                         status = response->status;  
