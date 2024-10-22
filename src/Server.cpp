@@ -37,12 +37,27 @@ namespace {
      */
     constexpr size_t DEFAULT_HEADER_LINE_LIMIT = 1000;
 
+    enum ParseSizeResult {
+        /**
+         * this indicates the size was parsed successfully. 
+         */
+        Success,
+        /**
+         * This indicates that the size isn't a number.
+         */
+        NotaNumber,
+        /**
+         * This indicates a size overflow detection.
+         */
+        Overflow
+    };
+
     /**
      * @return 
      *      An indication of whether or not the number was parsed
      *      successfully is returned
      */
-    bool ParseSize(
+    ParseSizeResult ParseSize(
         const std::string& stringSize,
         size_t& number 
     ) {
@@ -52,7 +67,7 @@ namespace {
                 (c < '0')
                 || (c > '9')
             ) { 
-                return false;
+                return ParseSizeResult::NotaNumber;
             }
             auto previousNumber = number;
             number *= 10;
@@ -60,11 +75,13 @@ namespace {
             if (
                 (number / 10) != previousNumber
             ) {
-                return false;
+                return ParseSizeResult::Overflow;
             }
         }
-        return true;
+        return ParseSizeResult::Success;
     }
+
+    
 
     /**
      * This method parses the method, target URI, and protocol identifier
@@ -429,12 +446,26 @@ namespace Http {
                 // that number of cahracters out (and bail if we don't have anough) 
                 if (request->headers.HasHeader("Content-Length")) {
                     size_t contentLength;
-                    if (!ParseSize(request->headers.GetHeaderValue("Content-Length"), contentLength)) { 
-                        request->state = Request::RequestParsingState::Error;
-                        return messageEnd;
+                    switch (ParseSize(request->headers.GetHeaderValue("Content-Length"), contentLength)) {
+
+                        case ParseSizeResult::NotaNumber:
+                        {
+                            request->state = Request::RequestParsingState::Error;
+                            return messageEnd;
+                        } 
+                        case ParseSizeResult::Overflow:
+                        {
+                            request->state = Request::RequestParsingState::Error;
+                            request->responseStatusCode = 413;
+                            request->responseStatusPhrase = "Payload Too Large";
+                            return messageEnd;
+                        } 
+                        
                     }
                     if (contentLength > MAX_CONTENT_LENGTH) {
                         request->state = Request::RequestParsingState::Error;
+                        request->responseStatusCode = 413;
+                        request->responseStatusPhrase = "Payload Too Large";
                         return messageEnd;
                     } 
                     if (contentLength > bodyAvailableSize) {
@@ -544,6 +575,23 @@ namespace Http {
                         statusCode = 404;
                         status = "Not Found";
                     }    
+                } else if (
+                    (request->state == Request::RequestParsingState::Error)
+                    && (request->responseStatusCode == 413)
+                ){
+                    const std::string response = (
+                        StringUtils::sprintf("HTTP/1.1 %u %s\r\n"
+                            "Content-Length: 13\r\n"
+                            "Content-Type: text/plain\r\n"
+                            "\r\n"
+                            "BadRequest.\r\n",
+                            request->responseStatusCode,
+                            request->responseStatusPhrase.c_str()
+                        )
+                    );
+                    responseText = response;
+                    statusCode = request->responseStatusCode;
+                    status = request->responseStatusPhrase;
                 } else {
                     const std::string cannedResponse = (
                         "HTTP/1.1 400 Bad Request\r\n"

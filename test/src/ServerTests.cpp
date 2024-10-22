@@ -710,7 +710,7 @@ TEST_F(ServerTests, ClientInvalidRequestUnrecoverable) {
         )
     );
     const std::string expectedResponse = (
-        "HTTP/1.1 400 Bad Request\r\n"
+        "HTTP/1.1 413 Payload Too Large\r\n"
         "Content-Length: 13\r\n"
         "Content-Type: text/plain\r\n"
         "\r\n"
@@ -910,8 +910,7 @@ TEST_F(ServerTests, ServerTests_HostNotMatchingServerUri_Test) {
     }
 }
 
-TEST_F(ServerTests, ServerTests_ServerSetContentLength_Test) {
-    
+TEST_F(ServerTests, ServerTests_ServerSetContentLength_Test) {    
     auto transport = std::make_shared< MockTransport >();
     (void)server.Mobilize(transport, 1234);
     auto connection = std::make_shared< MockConnection >();
@@ -948,6 +947,38 @@ TEST_F(ServerTests, ServerTests_ServerSetContentLength_Test) {
         )
     );
     ASSERT_EQ("6", response->headers.GetHeaderValue("Content-Length"));
+}
+
+TEST_F(ServerTests, ClientSentRequestWithTooLargePayload) {
+    auto transport = std::make_shared< MockTransport >();
+    (void)server.Mobilize(transport, 1234);
+    auto connection = std::make_shared< MockConnection >();
+    transport->connectionDelegate(connection);
+    std::vector< Uri::Uri > requestsReceived;
+    const std::string request(
+        "GET /hello.txt HTTP/1.1\r\n"
+        "User-Agent: curl/7.16.3 libcurl/7.16.3 OpenSSL/0.9.7l zlib/1.2.3\r\n"
+        "Host: www.example.com\r\n"
+        "Content-Length: 100000000000000000000000000000000000000000000000000000000000000\r\n"
+        "Accept-Language: en, mi\r\n"
+        "\r\n"
+    );
+    connection->dataReceivedDelegate(   
+        std::vector< uint8_t >(
+            request.begin(),
+            request.end()
+        )
+    );
+    Http::Client client;
+    const auto response = client.ParseResponse(
+        std::string(
+            connection->dataReceived.begin(),
+            connection->dataReceived.end()
+        )
+    );
+    EXPECT_EQ(413, response->statusCode);
+    EXPECT_EQ("Payload Too Large", response->status);
+    EXPECT_TRUE(connection->broken);
 }
 
 TEST_F(ServerTests, ServerTests_DefaultServerUri_Test) {

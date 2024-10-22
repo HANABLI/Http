@@ -3,29 +3,31 @@
 
 /**
  * @file Server.hpp
- * 
+ *
  * This module declares the Http::IServer interface.
- * 
+ *
  * © 2024 by Hatem Nabli
  */
 
 #include "ServerTransportLayer.hpp"
 
+#include <Http/Client.hpp>
+#include <MessageHeaders/MessageHeaders.hpp>
+#include <SystemUtils/DiagnosticsSender.hpp>
+#include <Uri/Uri.hpp>
 #include <functional>
 #include <memory>
 #include <ostream>
 #include <stdint.h>
 #include <string>
-#include <Uri/Uri.hpp>
-#include <Http/Client.hpp>
-#include <SystemUtils/DiagnosticsSender.hpp>
-#include <MessageHeaders/MessageHeaders.hpp>
-namespace Http {
+namespace Http
+{
     /**
-     * This is the public interface to the webserver from plugins 
+     * This is the public interface to the webserver from plugins
      * and other modules that ara outside the HTTP server.
      */
-    class IServer {
+    class IServer
+    {
         //
     public:
         /**
@@ -40,7 +42,8 @@ namespace Http {
              * This type is used to track how much of the next request
              * has been parsed so far.
              */
-            enum class RequestParsingState {
+            enum class RequestParsingState
+            {
                 /**
                  * In this state, we're still waiting to receive
                  * the full request line.
@@ -60,7 +63,7 @@ namespace Http {
                  * haven't yet received all of the body.
                  */
                 Body,
-                
+
                 /**
                  * In this state, the request is fully constructed
                  * or is invalid, but the connection from which the request
@@ -79,7 +82,7 @@ namespace Http {
             };
 
             /**
-             * This flag indicates whether or not the request 
+             * This flag indicates whether or not the request
              * has passed all validity steps.
              */
             bool valid = true;
@@ -97,7 +100,7 @@ namespace Http {
             Uri::Uri target;
 
             /**
-             * This are the messages headers that were included 
+             * This are the messages headers that were included
              * in the request
              */
             MessageHeaders::MessageHeaders headers;
@@ -114,131 +117,137 @@ namespace Http {
              */
             RequestParsingState state = RequestParsingState::RequestLine;
 
+            /**
+             * If the state of the request is State::Error, or if
+             * the request is not valid, this indicates the status
+             * code which should be given back to the client.
+             */
+            unsigned int responseStatusCode = 400;
+
+            /**
+             * If the state of the request is State::Error, or if
+             * the request is not valid, this is the code description
+             * of the satus code.
+             */
+            std::string responseStatusPhrase{"Bad Request"};
+
             // Methods
             /**
              * This method returns an indication of whether or not the request
              * has been fully constructed (valid or not).
-             * 
+             *
              * @return
              *      An indication of whether or not the request
              *      has been fully constructed is returned.
              */
             bool IsProcessed() const;
         };
-        
+
         /**
-         * This is the type of the function to be registred to handle 
+         * This is the type of the function to be registred to handle
          * HTTP requests.
-         * 
+         *
          * @param[in] request
          *      This is the request to apply to the resource.
-         * 
+         *
          * @return
          *      The response to be returned to the client is returned.
          */
-        typedef std::function< 
-            std::shared_ptr< Client::Response >( 
-                std::shared_ptr< Request > request
-            ) 
-        > ResourceDelegate;
+        typedef std::function<
+            std::shared_ptr<Client::Response>(
+                std::shared_ptr<Request> request)>
+            ResourceDelegate;
 
         /**
          * This is the type of function returned by RegisterResource,
          * to be called when the resource should be unregistered from
          * the server
          */
-        typedef std::function< void() > UnregistrationDelegate;
+        typedef std::function<void()> UnregistrationDelegate;
 
     public:
-
         /**
          * This method returns the value of a given server configuration
          * item.
-         * 
+         *
          * @param[in] key
          *      this is the key identifier of the configuration item
          *      whose value should be returned.
-         * 
+         *
          * @return
          *      The value of the configuration item is returned.
          */
-        virtual std::string GetConfigurationItem(const std::string& key) = 0;
-        
+        virtual std::string GetConfigurationItem(const std::string &key) = 0;
+
         /**
-         * This method sets the value of the given server configuration 
+         * This method sets the value of the given server configuration
          * item.
-         * 
-         * 
+         *
+         *
          * @param[in] key
          *      This is the key identifier of the configuration server
          *      item whose value should be set.
          * @param[in] value
          *      This is the value to be set for the configuration item
          */
-        virtual void SetConfigurationItem(const std::string& key, const std::string& value) = 0;
+        virtual void SetConfigurationItem(const std::string &key, const std::string &value) = 0;
 
         /**
-        * This method forms a new subscription to diagnostic
-        * messages published by the sender.
-        * 
-        * @param[in] delegate
-        *       This is the function to call to deliver messages
-        *       to this subscriber.
-        * 
-        * @param[in] minLevel
-        *       This is the minimum level of message that this subscriber
-        *       desires to receive.
-        * @return
-        *       A function is returned which my be called
-        *       to terminate the subscription.
-        */
+         * This method forms a new subscription to diagnostic
+         * messages published by the sender.
+         *
+         * @param[in] delegate
+         *       This is the function to call to deliver messages
+         *       to this subscriber.
+         *
+         * @param[in] minLevel
+         *       This is the minimum level of message that this subscriber
+         *       desires to receive.
+         * @return
+         *       A function is returned which my be called
+         *       to terminate the subscription.
+         */
         virtual SystemUtils::DiagnosticsSender::UnsubscribeDelegate SubscribeToDiagnostics(
             SystemUtils::DiagnosticsSender::DiagnosticMessageDelegate delegate,
-            size_t minLevel = 0
-        ) = 0;
-
+            size_t minLevel = 0) = 0;
 
         /**
          * This method registers the given delegate to be called in order to generate
          * a response for any request that comes in to the server with a target URI which
          * identifies a resource within the given resource subspace of the server.
-         * 
+         *
          * @param[in] resourceSubspacePath
          *      This identifies the subspace of resources that we want the given
          *      delegate to be responsible for handling.
-         * 
+         *
          * @param[in] resourceDelegate
          *      This is the function to call in order to apply the given
-         *      request and come up with a response when the request identifies 
+         *      request and come up with a response when the request identifies
          *      a resource within the given resource subspace of the server.
          * @return
          *      A function is returned which, if called, revokes the registration
          *      of the resource delegate, so that subsequent requests to any resource
-         *      within the registered resource substate are no longer handled by the 
+         *      within the registered resource substate are no longer handled by the
          *      formerly-registered delegate.
          */
         virtual UnregistrationDelegate RegisterResource(
-            const std::vector< std::string >& resourceSubspacePath, 
-            ResourceDelegate resourceDelegate
-        ) = 0;
-
-
+            const std::vector<std::string> &resourceSubspacePath,
+            ResourceDelegate resourceDelegate) = 0;
     };
-        /**
-         * This is a support function for googleTest to print out
-         * values of the Server::Request::Validity class.
-         * 
-         * @param[in] state
-         *      This is the request state to print out.
-         * 
-         * @param[in] os
-         *      This is a pointer to the stream to wish to print 
-         *      the request state.
-         */
-        void  PrintTo(
-            const IServer::Request::RequestParsingState& state,
-            std::ostream* os
-        );
+    /**
+     * This is a support function for googleTest to print out
+     * values of the Server::Request::Validity class.
+     *
+     * @param[in] state
+     *      This is the request state to print out.
+     *
+     * @param[in] os
+     *      This is a pointer to the stream to wish to print
+     *      the request state.
+     */
+    void PrintTo(
+        const IServer::Request::RequestParsingState &state,
+        std::ostream *os);
 }
 
 #endif /* HTTP_I_SERVER_HPP */
