@@ -714,13 +714,12 @@ namespace Http {
             impl_->reaper = std::thread(&Impl::Reaper, impl_.get());
     }
 
-       bool Server::Mobilize(
-        std::shared_ptr< ServerTransportLayer > transport,
-        uint16_t port
+       bool Server::Mobilize(const
+        MobilizationDependencies& dep
     ) {
-        impl_->transport = transport;
+        impl_->transport = dep.transport;
         if (impl_->transport->BindNetwork(
-            port,
+            dep.port,
             [this](std::shared_ptr< Connection > connection) {
                 impl_->NewConnection(connection);
             }
@@ -728,7 +727,7 @@ namespace Http {
             impl_->diagnosticsSender.SendDiagnosticInformationFormatted(
                 3,
                 "Now listening on port %" PRIu16,
-                port
+                dep.port
             );
         } else {
             impl_->transport = nullptr;

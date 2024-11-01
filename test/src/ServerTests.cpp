@@ -473,14 +473,16 @@ TEST_F(ServerTests, ParseValideHeaderLineLongerThanDefault) {
 
 TEST_F(ServerTests, ServerTests_Mobiliz_Test) {
     auto transport = std::make_shared< MockTransport >();
-    ASSERT_TRUE(server.Mobilize(transport, 1234));
+    const Http::Server::MobilizationDependencies dep = {transport, 1234};
+    ASSERT_TRUE(server.Mobilize(dep));
     ASSERT_EQ(1234, transport->port);
     ASSERT_FALSE(transport->connectionDelegate == nullptr);
 }
 
 TEST_F(ServerTests, ServerTests_Demobilize_Test) {
     auto transport = std::make_shared< MockTransport >();
-    (void)server.Mobilize(transport, 1234);
+    const Http::Server::MobilizationDependencies dep = {transport, 1234};
+    (void)server.Mobilize(dep);
     server.Demobilize();
     ASSERT_FALSE(transport->bound);
 }
@@ -489,14 +491,16 @@ TEST_F(ServerTests, ServerTests_ReleaseNetworkUponDestruction_Test) {
     auto transport = std::make_shared< MockTransport >();
     {
         Http::Server tmpServer;
-        (void)tmpServer.Mobilize(transport, 1234);
+        const Http::Server::MobilizationDependencies dep = {transport, 1234};
+        (void)tmpServer.Mobilize(dep);
     }
     ASSERT_FALSE(transport->bound);
 }
 
 TEST_F(ServerTests, Expect404FromClientRequest) {
     auto transport = std::make_shared< MockTransport >();
-    (void)server.Mobilize(transport, 1234);
+    const Http::Server::MobilizationDependencies dep = {transport, 1234};
+    (void)server.Mobilize(dep);
     auto connection = std::make_shared< MockConnection >();
     transport->connectionDelegate(connection);
     ASSERT_FALSE(connection->dataReceivedDelegate == nullptr);
@@ -532,7 +536,8 @@ TEST_F(ServerTests, Expect404FromClientRequest) {
 
 TEST_F(ServerTests, ServerTests_Expect404FromClientRequestInTwoPieces__Test) {
     auto transport = std::make_shared< MockTransport >();
-    (void)server.Mobilize(transport, 1234);
+    const Http::Server::MobilizationDependencies dep = {transport, 1234};
+    (void)server.Mobilize(dep);
     ASSERT_EQ(
         (std::vector< std::string >{
             "Http::Server[3]: Now listening on port 1234",
@@ -597,7 +602,8 @@ TEST_F(ServerTests, ServerTests_Expect404FromClientRequestInTwoPieces__Test) {
 
 TEST_F(ServerTests, twoClientRequestsInOnePiece) {
     auto transport = std::make_shared< MockTransport >();
-    (void)server.Mobilize(transport, 1234);
+    const Http::Server::MobilizationDependencies dep = {transport, 1234};
+    (void)server.Mobilize(dep);
     auto connection = std::make_shared< MockConnection >();
     transport->connectionDelegate(connection);
     ASSERT_FALSE(connection->dataReceivedDelegate == nullptr);
@@ -643,7 +649,8 @@ TEST_F(ServerTests, twoClientRequestsInOnePiece) {
 
 TEST_F(ServerTests, ClientInvalidRequestRecoverable) {
     auto transport = std::make_shared< MockTransport >();
-    (void)server.Mobilize(transport, 1234);
+    const Http::Server::MobilizationDependencies dep = {transport, 1234};
+    (void)server.Mobilize(dep);
     auto connection = std::make_shared< MockConnection >();
     transport->connectionDelegate(connection);
     ASSERT_FALSE(connection->dataReceivedDelegate == nullptr);
@@ -690,7 +697,8 @@ TEST_F(ServerTests, ClientInvalidRequestRecoverable) {
 
 TEST_F(ServerTests, ClientInvalidRequestUnrecoverable) {
     auto transport = std::make_shared< MockTransport >();
-    (void)server.Mobilize(transport, 1234);
+    const Http::Server::MobilizationDependencies dep = {transport, 1234};
+    (void)server.Mobilize(dep);
     auto connection = std::make_shared< MockConnection >();
     transport->connectionDelegate(connection);
     ASSERT_FALSE(connection->dataReceivedDelegate == nullptr);
@@ -728,7 +736,8 @@ TEST_F(ServerTests, ClientInvalidRequestUnrecoverable) {
 
 TEST_F(ServerTests, ServerTests_ClientConnectionBroken_Test) {
     auto transport = std::make_shared< MockTransport >();
-    (void)server.Mobilize(transport, 1234);
+    const Http::Server::MobilizationDependencies dep = {transport, 1234};
+    (void)server.Mobilize(dep);
     auto connection = std::make_shared< MockConnection >();
     transport->connectionDelegate(connection);
     ASSERT_FALSE(connection->brokenDelegate == nullptr);
@@ -745,7 +754,8 @@ TEST_F(ServerTests, ServerTests_ClientConnectionBroken_Test) {
 
 TEST_F(ServerTests, ClientShouldNotBeRaleasedDuringBreakDelegateCall) {
     auto transport = std::make_shared< MockTransport >();
-    (void)server.Mobilize(transport, 1234);
+    const Http::Server::MobilizationDependencies dep = {transport, 1234};
+    (void)server.Mobilize(dep);
     auto connection = std::make_shared< MockConnection >();
     transport->connectionDelegate(connection);
     auto connectionRaw = connection.get();
@@ -772,7 +782,8 @@ TEST_F(ServerTests, ParseInvalidRequestLineTooLong) {
 
 TEST_F(ServerTests, ConnectionCloseOrNot) {
     auto transport = std::make_shared< MockTransport >();
-    (void)server.Mobilize(transport, 1234);
+    const Http::Server::MobilizationDependencies dep = {transport, 1234};
+    (void)server.Mobilize(dep);
 
     for (int i = 0; i < 2; ++i) {
         const auto tellServertoCloseAfterResponse = (i == 0);
@@ -805,7 +816,8 @@ TEST_F(ServerTests, ConnectionCloseOrNot) {
 
 TEST_F(ServerTests, ServerTests_HostMissing_Test) {
     auto transport = std::make_shared< MockTransport >();
-    (void)server.Mobilize(transport, 1234);
+    const Http::Server::MobilizationDependencies dep = {transport, 1234};
+    (void)server.Mobilize(dep);
     auto connection = std::make_shared< MockConnection >();
     transport->connectionDelegate(connection);
     const std::string request(
@@ -834,7 +846,8 @@ TEST_F(ServerTests, ServerTests_HostMissing_Test) {
 TEST_F(ServerTests, ServerTests_HostNotMatchingTargetUri_Test) {
     
     auto transport = std::make_shared< MockTransport >();
-    (void)server.Mobilize(transport, 1234);
+    const Http::Server::MobilizationDependencies dep = {transport, 1234};
+    (void)server.Mobilize(dep);
     auto connection = std::make_shared< MockConnection >();
     transport->connectionDelegate(connection);
     const std::string request(
@@ -876,7 +889,8 @@ TEST_F(ServerTests, ServerTests_HostNotMatchingServerUri_Test) {
     size_t index = 0;
     for (const auto& testVector: testVectors) {
         auto transport = std::make_shared< MockTransport >();
-        (void)server.Mobilize(transport, 1234);
+        const Http::Server::MobilizationDependencies dep = {transport, 1234};
+        (void)server.Mobilize(dep);
         auto connection = std::make_shared< MockConnection >();
         transport->connectionDelegate(connection);
         const std::string request(
@@ -912,7 +926,8 @@ TEST_F(ServerTests, ServerTests_HostNotMatchingServerUri_Test) {
 
 TEST_F(ServerTests, ServerTests_ServerSetContentLength_Test) {    
     auto transport = std::make_shared< MockTransport >();
-    (void)server.Mobilize(transport, 1234);
+    const Http::Server::MobilizationDependencies dep = {transport, 1234};
+    (void)server.Mobilize(dep);
     auto connection = std::make_shared< MockConnection >();
     transport->connectionDelegate(connection);
     std::vector< Uri::Uri > requestsReceived;
@@ -951,7 +966,8 @@ TEST_F(ServerTests, ServerTests_ServerSetContentLength_Test) {
 
 TEST_F(ServerTests, ClientSentRequestWithTooLargePayload) {
     auto transport = std::make_shared< MockTransport >();
-    (void)server.Mobilize(transport, 1234);
+    const Http::Server::MobilizationDependencies dep = {transport, 1234};
+    (void)server.Mobilize(dep);
     auto connection = std::make_shared< MockConnection >();
     transport->connectionDelegate(connection);
     std::vector< Uri::Uri > requestsReceived;
@@ -990,7 +1006,8 @@ TEST_F(ServerTests, ServerTests_DefaultServerUri_Test) {
     size_t index = 0;
     for (const auto testVector: testVectors) { 
         auto transport = std::make_shared< MockTransport >();
-        (void)server.Mobilize(transport, 1234);
+        const Http::Server::MobilizationDependencies dep = {transport, 1234};
+        (void)server.Mobilize(dep);
         auto connection = std::make_shared< MockConnection >();
         transport->connectionDelegate(connection);
         const std::string request(
@@ -1021,7 +1038,8 @@ TEST_F(ServerTests, ServerTests_DefaultServerUri_Test) {
 
 TEST_F(ServerTests, ServerTests_RegisterResourceSubspaceDelegate__Test) {
     auto transport = std::make_shared< MockTransport >();
-    (void)server.Mobilize(transport, 1234);
+    const Http::Server::MobilizationDependencies dep = {transport, 1234};
+    (void)server.Mobilize(dep);
     auto connection = std::make_shared < MockConnection >();
     transport->connectionDelegate(connection);
 
@@ -1097,7 +1115,8 @@ TEST_F(ServerTests, ServerTests_RegisterResourceSubspaceDelegate__Test) {
 
 TEST_F(ServerTests, ServerTests_RegisterResourceWideServerDelegate__Test) {
     auto transport = std::make_shared< MockTransport >();
-    (void)server.Mobilize(transport, 1234);
+    const Http::Server::MobilizationDependencies dep = {transport, 1234};
+    (void)server.Mobilize(dep);
     auto connection = std::make_shared < MockConnection >();
     transport->connectionDelegate(connection);
 
@@ -1173,7 +1192,8 @@ TEST_F(ServerTests, ServerTests_RegisterResourceWideServerDelegate__Test) {
 
 TEST_F(ServerTests, ServerTests_DontAllowDoubleRegistration_Test) {
     auto transport = std::make_shared< MockTransport >();
-    (void)server.Mobilize(transport, 1234);
+    const Http::Server::MobilizationDependencies dep = {transport, 1234};
+    (void)server.Mobilize(dep);
     auto connection = std::make_shared < MockConnection >();
     transport->connectionDelegate(connection);
 
@@ -1199,7 +1219,8 @@ TEST_F(ServerTests, ServerTests_DontAllowDoubleRegistration_Test) {
 
 TEST_F(ServerTests, ServerTests_DontAllowOverlappingSubspaces_Test) {
     auto transport = std::make_shared< MockTransport >();
-    (void)server.Mobilize(transport, 1234);
+    const Http::Server::MobilizationDependencies dep = {transport, 1234};
+    (void)server.Mobilize(dep);
     auto connection = std::make_shared < MockConnection >();
     transport->connectionDelegate(connection);
 
