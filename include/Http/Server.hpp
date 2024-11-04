@@ -10,6 +10,7 @@
  */
 #include "IServer.hpp"
 #include "ServerTransportLayer.hpp"
+#include "TimeKeeper.hpp"
 
 #include <functional>
 #include <memory>
@@ -37,6 +38,10 @@ namespace Http {
              * to establish connections with the server.
              */
             uint16_t port;
+            /**
+             * This represents the time keeper of the server.
+             */
+            std::shared_ptr< TimeKeeper > timeKeeper;
         };
         
 

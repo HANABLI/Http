@@ -10,6 +10,7 @@ set(Headers
     include/Http/IServer.hpp
     include/Http/Server.hpp
     include/Http/Client.hpp
+    include/Http/TimeKeeper.hpp
     include/Http/Connection.hpp
     include/Http/ServerTransportLayer.hpp
 )
