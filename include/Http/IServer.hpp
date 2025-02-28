@@ -11,6 +11,7 @@
 
 #include "ServerTransportLayer.hpp"
 
+#include <stdint.h>
 #include <Http/Client.hpp>
 #include <MessageHeaders/MessageHeaders.hpp>
 #include <SystemUtils/DiagnosticsSender.hpp>
@@ -18,7 +19,6 @@
 #include <functional>
 #include <memory>
 #include <ostream>
-#include <stdint.h>
 #include <string>
 namespace Http
 {
@@ -69,7 +69,7 @@ namespace Http
                  * or is invalid, but the connection from which the request
                  * was constructed can remain open to accept another request.
                  */
-                Complete, ///< request parsed successfully
+                Complete,  ///< request parsed successfully
 
                 /**
                  * In this state, connection from which the request was
@@ -77,7 +77,7 @@ namespace Http
                  * reasons, or because it would be impossible or unlikely
                  * to receive a valid request after this one.
                  */
-                Error ///< bad request, server should close connection
+                Error  ///< bad request, server should close connection
 
             };
 
@@ -153,9 +153,7 @@ namespace Http
          * @return
          *      The response to be returned to the client is returned.
          */
-        typedef std::function<
-            std::shared_ptr<Client::Response>(
-                std::shared_ptr<Request> request)>
+        typedef std::function<std::shared_ptr<Client::Response>(std::shared_ptr<Request> request)>
             ResourceDelegate;
 
         /**
@@ -177,7 +175,7 @@ namespace Http
          * @return
          *      The value of the configuration item is returned.
          */
-        virtual std::string GetConfigurationItem(const std::string &key) = 0;
+        virtual std::string GetConfigurationItem(const std::string& key) = 0;
 
         /**
          * This method sets the value of the given server configuration
@@ -190,7 +188,7 @@ namespace Http
          * @param[in] value
          *      This is the value to be set for the configuration item
          */
-        virtual void SetConfigurationItem(const std::string &key, const std::string &value) = 0;
+        virtual void SetConfigurationItem(const std::string& key, const std::string& value) = 0;
 
         /**
          * This method forms a new subscription to diagnostic
@@ -231,7 +229,7 @@ namespace Http
          *      formerly-registered delegate.
          */
         virtual UnregistrationDelegate RegisterResource(
-            const std::vector<std::string> &resourceSubspacePath,
+            const std::vector<std::string>& resourceSubspacePath,
             ResourceDelegate resourceDelegate) = 0;
     };
     /**
@@ -245,9 +243,7 @@ namespace Http
      *      This is a pointer to the stream to wish to print
      *      the request state.
      */
-    void PrintTo(
-        const IServer::Request::RequestParsingState &state,
-        std::ostream *os);
-}
+    void PrintTo(const IServer::Request::RequestParsingState& state, std::ostream* os);
+}  // namespace Http
 
 #endif /* HTTP_I_SERVER_HPP */

@@ -1,7 +1,7 @@
 /**
  * @file ClientTests.cpp
- * 
- * This module contains tests units of the 
+ *
+ * This module contains tests units of the
  * Http::Client class.
  */
 
@@ -16,14 +16,13 @@ TEST(ClientTests, ClientTests_ParseGetResponse_Test) {
         "Date: Mon, 27 Jul 2009 12:28:53 GMT\r\n"
         "Server: Apache\r\n"
         "Last-Modified: Wed, 22 Jul 2009 19:15:56 GMT\r\n"
-        "ETag: \"34aa387-d-1568eb00\"\r\n"  
+        "ETag: \"34aa387-d-1568eb00\"\r\n"
         "Accept-Ranges: bytes\r\n"
         "Content-Length: 51\r\n"
         "Vary: Accept-Encoding\r\n"
         "Content-Type: text/plain\r\n"
         "\r\n"
-        "Hello World! My payload includes a trailing CRLF.\r\n"
-    );
+        "Hello World! My payload includes a trailing CRLF.\r\n");
     ASSERT_FALSE(response == nullptr);
     ASSERT_EQ(200, response->statusCode);
     ASSERT_TRUE(response->headers.HasHeader("Date"));
@@ -42,14 +41,13 @@ TEST(ClientTests, ClientTests_ParseIncompleteBodyResponse_Test) {
         "Date: Mon, 27 Jul 2009 12:28:53 GMT\r\n"
         "Server: Apache\r\n"
         "Last-Modified: Wed, 22 Jul 2009 19:15:56 GMT\r\n"
-        "ETag: \"34aa387-d-1568eb00\"\r\n"  
+        "ETag: \"34aa387-d-1568eb00\"\r\n"
         "Accept-Ranges: bytes\r\n"
         "Content-Length: 55\r\n"
         "Vary: Accept-Encoding\r\n"
         "Content-Type: text/plain\r\n"
         "\r\n"
-        "Hello World! My payload includes a trailing CRLF.\r\n"
-    );
+        "Hello World! My payload includes a trailing CRLF.\r\n");
     ASSERT_TRUE(response == nullptr);
 }
 
@@ -60,10 +58,9 @@ TEST(ClientTests, ClientTests_ParseIncompleteHEadersResponse_Test) {
         "Date: Mon, 27 Jul 2009 12:28:53 GMT\r\n"
         "Server: Apache\r\n"
         "Last-Modified: Wed, 22 Jul 2009 19:15:56 GMT\r\n"
-        "ETag: \"34aa387-d-1568eb00\"\r\n"  
+        "ETag: \"34aa387-d-1568eb00\"\r\n"
         "Accept-Ranges: bytes\r\n"
-        "Content-Length: "
-    );
+        "Content-Length: ");
     ASSERT_TRUE(response == nullptr);
 }
 
@@ -74,10 +71,9 @@ TEST(ClientTests, ClientTests_ParseIncompleteStatusLineResponse_Test) {
         "Date: Mon, 27 Jul 2009 12:28:53 GMT\r\n"
         "Server: Apache\r\n"
         "Last-Modified: Wed, 22 Jul 2009 19:15:56 GMT\r\n"
-        "ETag: \"34aa387-d-1568eb00\"\r\n"  
+        "ETag: \"34aa387-d-1568eb00\"\r\n"
         "Accept-Ranges: bytes\r\n"
-        "Content-Length: "
-    );
+        "Content-Length: ");
     ASSERT_TRUE(response == nullptr);
 }
 
@@ -88,12 +84,11 @@ TEST(ClientTests, ClientTests_ParseNoBodyDelimiterResponse_Test) {
         "Date: Mon, 27 Jul 2009 12:28:53 GMT\r\n"
         "Server: Apache\r\n"
         "Last-Modified: Wed, 22 Jul 2009 19:15:56 GMT\r\n"
-        "ETag: \"34aa387-d-1568eb00\"\r\n"  
+        "ETag: \"34aa387-d-1568eb00\"\r\n"
         "Accept-Ranges: bytes\r\n"
         "Content-Length: 51\r\n"
         "Vary: Accept-Encoding\r\n"
-        "Content-Type: text/plain\r\n"
-    );
+        "Content-Type: text/plain\r\n");
     ASSERT_TRUE(response == nullptr);
 }
 
@@ -104,13 +99,12 @@ TEST(ClientTests, ClientTests_ParseNoContentLengthResponse_Test) {
         "Date: Mon, 27 Jul 2009 12:28:53 GMT\r\n"
         "Server: Apache\r\n"
         "Last-Modified: Wed, 22 Jul 2009 19:15:56 GMT\r\n"
-        "ETag: \"34aa387-d-1568eb00\"\r\n"  
+        "ETag: \"34aa387-d-1568eb00\"\r\n"
         "Accept-Ranges: bytes\r\n"
         "Vary: Accept-Encoding\r\n"
         "Content-Type: text/plain\r\n"
-         "\r\n"
-        "Hello World! My payload includes a trailing CRLF.\r\n"
-    );
+        "\r\n"
+        "Hello World! My payload includes a trailing CRLF.\r\n");
     ASSERT_FALSE(response == nullptr);
     ASSERT_EQ("", response->body);
 }
@@ -133,13 +127,12 @@ TEST(ClientTests, ClientTests_ResponseToString_Test) {
         "Date: Mon, 27 Jul 2009 12:28:53 GMT\r\n"
         "Server: Apache\r\n"
         "Last-Modified: Wed, 22 Jul 2009 19:15:56 GMT\r\n"
-        "ETag: \"34aa387-d-1568eb00\"\r\n"  
+        "ETag: \"34aa387-d-1568eb00\"\r\n"
         "Accept-Ranges: bytes\r\n"
         "Content-Length: 51\r\n"
         "Vary: Accept-Encoding\r\n"
         "Content-Type: text/plain\r\n"
         "\r\n"
-        "Hello World! My payload includes a trailing CRLF.\r\n", 
-        response.GenerateToString()
-    );    
+        "Hello World! My payload includes a trailing CRLF.\r\n",
+        response.GenerateToString());
 }
