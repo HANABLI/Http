@@ -662,7 +662,7 @@ namespace Http
                     if ((resource != nullptr) && (resource->handler != nullptr))
                     {
                         request->target.SetPath({resourcePath.begin(), resourcePath.end()});
-                        response = resource->handler(request);
+                        response = resource->handler(request, connectionState->connection);
                     } else
                     {
                         response = std::make_shared<Http::Client::Response>();

@@ -153,7 +153,8 @@ namespace Http
          * @return
          *      The response to be returned to the client is returned.
          */
-        typedef std::function<std::shared_ptr<Client::Response>(std::shared_ptr<Request> request)>
+        typedef std::function<std::shared_ptr<Client::Response>(
+            std::shared_ptr<Request> request, std::shared_ptr<Connection> connection)>
             ResourceDelegate;
 
         /**

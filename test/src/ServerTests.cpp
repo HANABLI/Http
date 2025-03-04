@@ -816,7 +816,8 @@ TEST_F(ServerTests, ServerTests_ServerSetContentLength_Test) {
     transport->connectionDelegate(connection);
     std::vector<Uri::Uri> requestsReceived;
     const auto resourceDelegate =
-        [&requestsReceived](std::shared_ptr<Http::Server::Request> request)
+        [&requestsReceived](std::shared_ptr<Http::Server::Request> request,
+                            std::shared_ptr<Http::Connection> connection)
     {
         const auto response = std::make_shared<Http::Client::Response>();
         response->statusCode = 200;
@@ -914,7 +915,8 @@ TEST_F(ServerTests, ServerTests_RegisterResourceSubspaceDelegate__Test) {
     connection->dataReceived.clear();
 
     std::vector<Uri::Uri> requestsResived;
-    const auto resourceDelegate = [&requestsResived](std::shared_ptr<Http::Server::Request> request)
+    const auto resourceDelegate = [&requestsResived](std::shared_ptr<Http::Server::Request> request,
+                                                     std::shared_ptr<Http::Connection> connection)
     {
         const auto response = std::make_shared<Http::Client::Response>();
         response->statusCode = 200;
@@ -960,7 +962,8 @@ TEST_F(ServerTests, ServerTests_RegisterResourceWideServerDelegate__Test) {
     connection->dataReceived.clear();
 
     std::vector<Uri::Uri> requestsResived;
-    const auto resourceDelegate = [&requestsResived](std::shared_ptr<Http::Server::Request> request)
+    const auto resourceDelegate = [&requestsResived](std::shared_ptr<Http::Server::Request> request,
+                                                     std::shared_ptr<Http::Connection> connection)
     {
         const auto response = std::make_shared<Http::Client::Response>();
         response->statusCode = 200;
@@ -995,13 +998,15 @@ TEST_F(ServerTests, ServerTests_DontAllowDoubleRegistration_Test) {
     transport->connectionDelegate(connection);
 
     // Register /foo/bar delegate.
-    const auto foobar = [](std::shared_ptr<Http::Server::Request> request)
+    const auto foobar = [](std::shared_ptr<Http::Server::Request> request,
+                           std::shared_ptr<Http::Connection> connection)
     { return std::make_shared<Http::Client::Response>(); };
     const auto unregisterfoobar = server.RegisterResource({"foo", "bar"}, foobar);
 
     // Attempt to register another /foo/bar delegate.
     // This should not be allowed because /foo/bar resource already has a handler.
-    const auto anotherfoobar = [](std::shared_ptr<Http::Server::Request> request)
+    const auto anotherfoobar = [](std::shared_ptr<Http::Server::Request> request,
+                                  std::shared_ptr<Http::Connection> connection)
     { return std::make_shared<Http::Client::Response>(); };
     const auto unregisteranotherfoobar = server.RegisterResource({"foo", "bar"}, anotherfoobar);
 
@@ -1017,14 +1022,16 @@ TEST_F(ServerTests, ServerTests_DontAllowOverlappingSubspaces_Test) {
     transport->connectionDelegate(connection);
 
     // Register /foo/bar delegate.
-    const auto foobar = [](std::shared_ptr<Http::Server::Request> request)
+    const auto foobar = [](std::shared_ptr<Http::Server::Request> request,
+                           std::shared_ptr<Http::Connection> connection)
     { return std::make_shared<Http::Client::Response>(); };
     auto unregisterfoobar = server.RegisterResource({"foo", "bar"}, foobar);
 
     ASSERT_FALSE(unregisterfoobar == nullptr);
     // Attempt to register /foo delegate.
     // This should not be allowed because it would overlap the /foo/bar delegate.
-    const auto foo = [](std::shared_ptr<Http::Server::Request> request)
+    const auto foo = [](std::shared_ptr<Http::Server::Request> request,
+                        std::shared_ptr<Http::Connection> connection)
     { return std::make_shared<Http::Client::Response>(); };
     auto unregisterfoo = server.RegisterResource({"foo"}, foo);
 
