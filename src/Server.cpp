@@ -662,7 +662,8 @@ namespace Http
                     if ((resource != nullptr) && (resource->handler != nullptr))
                     {
                         request->target.SetPath({resourcePath.begin(), resourcePath.end()});
-                        response = resource->handler(request, connectionState->connection);
+                        response = resource->handler(request, connectionState->connection,
+                                                     connectionState->concatenateBuffer);
                     } else
                     {
                         response = std::make_shared<Http::Client::Response>();
@@ -719,6 +720,8 @@ namespace Http
                     { request->headers.SetHeader("Connection", "close"); }
                 }
                 IssueResponse(connectionState, response);
+                if (response->statusCode == 101)
+                { connectionState->connection = nullptr; }
                 // if (request->state == Request::RequestParsingState::Complete) {
                 //     const auto connectionTockens =
                 //     request->headers.GetHeaderMultiValues("Connection"); bool closeRequested =

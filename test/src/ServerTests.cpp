@@ -32,6 +32,12 @@ namespace
         bool callingDelegate = false;
 
         /**
+         * This is a function to be called when the mock connection
+         * is destroyed
+         */
+        std::function<void()> onDestruction;
+
+        /**
          * This is used to sysnchronize access to the wait condition.
          */
         std::recursive_mutex mutex;
@@ -70,6 +76,8 @@ namespace
             {
                 *((int*)0) = 42;  // force a crash (use in a death test)
             }
+            if (onDestruction != nullptr)
+            { onDestruction(); }
         }
 
         MockConnection(const MockConnection&) = delete;
@@ -817,7 +825,8 @@ TEST_F(ServerTests, ServerTests_ServerSetContentLength_Test) {
     std::vector<Uri::Uri> requestsReceived;
     const auto resourceDelegate =
         [&requestsReceived](std::shared_ptr<Http::Server::Request> request,
-                            std::shared_ptr<Http::Connection> connection)
+                            std::shared_ptr<Http::Connection> connection,
+                            const std::string& trailer)
     {
         const auto response = std::make_shared<Http::Client::Response>();
         response->statusCode = 200;
@@ -916,7 +925,8 @@ TEST_F(ServerTests, ServerTests_RegisterResourceSubspaceDelegate__Test) {
 
     std::vector<Uri::Uri> requestsResived;
     const auto resourceDelegate = [&requestsResived](std::shared_ptr<Http::Server::Request> request,
-                                                     std::shared_ptr<Http::Connection> connection)
+                                                     std::shared_ptr<Http::Connection> connection,
+                                                     const std::string& trailer)
     {
         const auto response = std::make_shared<Http::Client::Response>();
         response->statusCode = 200;
@@ -963,7 +973,8 @@ TEST_F(ServerTests, ServerTests_RegisterResourceWideServerDelegate__Test) {
 
     std::vector<Uri::Uri> requestsResived;
     const auto resourceDelegate = [&requestsResived](std::shared_ptr<Http::Server::Request> request,
-                                                     std::shared_ptr<Http::Connection> connection)
+                                                     std::shared_ptr<Http::Connection> connection,
+                                                     const std::string& trailer)
     {
         const auto response = std::make_shared<Http::Client::Response>();
         response->statusCode = 200;
@@ -999,14 +1010,15 @@ TEST_F(ServerTests, ServerTests_DontAllowDoubleRegistration_Test) {
 
     // Register /foo/bar delegate.
     const auto foobar = [](std::shared_ptr<Http::Server::Request> request,
-                           std::shared_ptr<Http::Connection> connection)
+                           std::shared_ptr<Http::Connection> connection, const std::string& trailer)
     { return std::make_shared<Http::Client::Response>(); };
     const auto unregisterfoobar = server.RegisterResource({"foo", "bar"}, foobar);
 
     // Attempt to register another /foo/bar delegate.
     // This should not be allowed because /foo/bar resource already has a handler.
     const auto anotherfoobar = [](std::shared_ptr<Http::Server::Request> request,
-                                  std::shared_ptr<Http::Connection> connection)
+                                  std::shared_ptr<Http::Connection> connection,
+                                  const std::string& trailer)
     { return std::make_shared<Http::Client::Response>(); };
     const auto unregisteranotherfoobar = server.RegisterResource({"foo", "bar"}, anotherfoobar);
 
@@ -1023,7 +1035,7 @@ TEST_F(ServerTests, ServerTests_DontAllowOverlappingSubspaces_Test) {
 
     // Register /foo/bar delegate.
     const auto foobar = [](std::shared_ptr<Http::Server::Request> request,
-                           std::shared_ptr<Http::Connection> connection)
+                           std::shared_ptr<Http::Connection> connection, const std::string& trailer)
     { return std::make_shared<Http::Client::Response>(); };
     auto unregisterfoobar = server.RegisterResource({"foo", "bar"}, foobar);
 
@@ -1031,7 +1043,7 @@ TEST_F(ServerTests, ServerTests_DontAllowOverlappingSubspaces_Test) {
     // Attempt to register /foo delegate.
     // This should not be allowed because it would overlap the /foo/bar delegate.
     const auto foo = [](std::shared_ptr<Http::Server::Request> request,
-                        std::shared_ptr<Http::Connection> connection)
+                        std::shared_ptr<Http::Connection> connection, const std::string& trailer)
     { return std::make_shared<Http::Client::Response>(); };
     auto unregisterfoo = server.RegisterResource({"foo"}, foo);
 
@@ -1088,4 +1100,72 @@ TEST_F(ServerTests, MobiliseWhenAlreadyMobilized) {
     deps.port = 1234;
     ASSERT_TRUE(server.Mobilize(deps));
     ASSERT_FALSE(server.Mobilize(deps));
+}
+
+TEST_F(ServerTests, ServerTests_UpgradedConnexion__Test) {
+    // Setup the server
+    auto transport = std::make_shared<MockTransport>();
+    auto timeKeeper = std::make_shared<MockTimeKeeper>();
+    const Http::Server::MobilizationDependencies dep = {transport, 1234, timeKeeper};
+    (void)server.Mobilize(dep);
+
+    //
+    bool requestReceived = false;
+    std::shared_ptr<Http::Connection> upgradedConnection;
+    std::string dataReceivedAfterUpgrading;
+    const auto resourceDelegate =
+        [&upgradedConnection, &requestReceived, &dataReceivedAfterUpgrading](
+            std::shared_ptr<Http::Server::Request> request,
+            std::shared_ptr<Http::Connection> connection, const std::string& trailer)
+    {
+        const auto response = std::make_shared<Http::Client::Response>();
+        response->statusCode = 101;
+        response->status = "Switching Protocols";
+        response->headers.SetHeader("Connection", "upgrade");
+        upgradedConnection = connection;
+        requestReceived = true;
+        dataReceivedAfterUpgrading = trailer;
+        upgradedConnection->SetConnectionBrokenDelegate([](bool graceful) {});
+        upgradedConnection->SetDataReceivedDelegate(
+            [&dataReceivedAfterUpgrading](std::vector<uint8_t> data)
+            { dataReceivedAfterUpgrading += std::string(data.begin(), data.end()); });
+        return response;
+    };
+    const auto unregistrationDelegate = server.RegisterResource({"foo"}, resourceDelegate);
+    // Start connection to the server
+    auto connection = std::make_shared<MockConnection>();
+    bool connectionDestroyed = false;
+    connection->onDestruction = [&connectionDestroyed] { connectionDestroyed = true; };
+    transport->connectionDelegate(connection);
+
+    const std::string request =
+        ("Get /foo/bar HTTP/1.1\r\n"
+         "Host: www.example.com\r\n"
+         "\r\n"
+         "Hello!\r\n");
+    connection->dataReceivedDelegate(std::vector<uint8_t>(request.begin(), request.end()));
+    Http::Client client;
+    const auto response = client.ParseResponse(
+        std::string(connection->dataReceived.begin(), connection->dataReceived.end()));
+    connection->dataReceived.clear();
+    EXPECT_TRUE(requestReceived);
+    EXPECT_EQ(101, response->statusCode);
+    ASSERT_EQ(connection, upgradedConnection);
+    EXPECT_EQ("Hello!\r\n", dataReceivedAfterUpgrading);
+    dataReceivedAfterUpgrading.clear();
+
+    // Send the request again. This time the request should not
+    // be routed to the resource handler, because the server should
+    // have relayed the connection to the resource handler
+    requestReceived = false;
+    connection->dataReceivedDelegate(std::vector<uint8_t>(request.begin(), request.end()));
+    EXPECT_TRUE(connection->dataReceived.empty());
+    EXPECT_FALSE(connection->broken);
+    EXPECT_FALSE(requestReceived);
+    EXPECT_EQ(request, dataReceivedAfterUpgrading);
+    // Release the upgraded connection. That should be the last
+    // reference to the connection, so expect it to have been destroyed.
+    connection = nullptr;
+    upgradedConnection = nullptr;
+    ASSERT_TRUE(connectionDestroyed);
 }
