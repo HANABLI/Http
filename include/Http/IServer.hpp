@@ -149,6 +149,13 @@ namespace Http
          *
          * @param[in] request
          *      This is the request to apply to the resource.
+         * @param[in] connection
+         *      This is the connection in which the request was made.
+         * @param[in] trailer
+         *      This holds any characters that have already been received
+         *      by the server and come after the end of the current request.
+         *      A handler that upgrades this connection might want to interpret
+         *      these characters whithin the context of the upgraded connection
          *
          * @return
          *      The response to be returned to the client is returned.
