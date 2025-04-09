@@ -41,7 +41,7 @@ namespace
     /**
      *
      */
-    constexpr long long TIMER_POLLING_PERIOD_MILLISECONDS = 100;
+    constexpr long long TIMER_POLLING_PERIOD_MILLISECONDS = 50;
 
     /**
      * This is the defult maximum number of seconds to allow to elapse
@@ -56,6 +56,12 @@ namespace
      * the last byte, before time out.
      */
     constexpr double DEFAULT_REQUEST_TIMEOUT_SECONDS = 60.0;
+
+    /**
+     * This is the defult public port number to which clients may connect
+     * to establish connections with the server.
+     */
+    constexpr uint16_t DEFAULT_PORT_NUMBER = 8888;
 
     enum ParseSizeResult
     {
@@ -251,6 +257,11 @@ namespace Http
         double requestTimeout = DEFAULT_REQUEST_TIMEOUT_SECONDS;
 
         /**
+         *
+         */
+        uint16_t port = DEFAULT_PORT_NUMBER;
+
+        /**
          * This flag indicates whether or not the server is running.
          */
         bool mobilized = false;
@@ -419,6 +430,10 @@ namespace Http
 
         /**
          * This method prepares the connection for the next client request
+         *
+         * @param[in] connectionState
+         *    This is the state of the connection for which to attempt
+         *    to assemble the next request.
          */
         void StartNextRequest(std::shared_ptr<ConnectionState> connectionState) {
             connectionState->nextRequest = std::make_shared<Request>();
@@ -753,7 +768,7 @@ namespace Http
          *      This is the new connection has been established for the server.
          */
         void NewConnection(std::shared_ptr<Connection> connection) {
-            // std::lock_guard< decltype(mutex) > lock(mutex);
+            std::lock_guard<decltype(mutex)> lock(mutex);
             diagnosticsSender.SendDiagnosticInformationFormatted(2, "New connection from %s",
                                                                  connection->GetPeerId().c_str());
             const auto connectionState = std::make_shared<ConnectionState>();
@@ -812,11 +827,12 @@ namespace Http
         if (impl_->mobilized)
         { return false; }
         impl_->transport = dep.transport;
-        if (impl_->transport->BindNetwork(dep.port, [this](std::shared_ptr<Connection> connection)
+        if (impl_->transport->BindNetwork(impl_->port,
+                                          [this](std::shared_ptr<Connection> connection)
                                           { impl_->NewConnection(connection); }))
         {
             impl_->diagnosticsSender.SendDiagnosticInformationFormatted(
-                3, "Now listening on port %" PRIu16, dep.port);
+                3, "Now listening on port %" PRIu16, impl_->port);
         } else
         {
             impl_->transport = nullptr;
@@ -882,6 +898,35 @@ namespace Http
                     0, "Header line limit changed from %zu to %zu", impl_->headerLineLimit,
                     newHeaderLineLimit);
                 impl_->headerLineLimit = newHeaderLineLimit;
+            }
+        } else if (key == "Port")
+        {
+            uint16_t newPort;
+            if (sscanf(value.c_str(), "%" SCNu16, &newPort) == 1)
+            {
+                impl_->diagnosticsSender.SendDiagnosticInformationFormatted(
+                    0, "Port number changed from % " PRIu16 "to %" PRIu16, impl_->port, newPort);
+                impl_->port = newPort;
+            }
+        } else if (key == "InactivityTimeout")
+        {
+            double newInactivityTimeout;
+            if (sscanf(value.c_str(), "%lf", &newInactivityTimeout) == 1)
+            {
+                impl_->diagnosticsSender.SendDiagnosticInformationFormatted(
+                    0, "InactivityTimeout number changed from %lf to %lf", impl_->inactivityTimeout,
+                    newInactivityTimeout);
+                impl_->inactivityTimeout = newInactivityTimeout;
+            }
+        } else if (key == "RequestTimeout")
+        {
+            double newRequestTimeout;
+            if (sscanf(value.c_str(), "%lf", &newRequestTimeout) == 1)
+            {
+                impl_->diagnosticsSender.SendDiagnosticInformationFormatted(
+                    0, "RequestTimeout number changed from %lf to %lf", impl_->requestTimeout,
+                    newRequestTimeout);
+                impl_->requestTimeout = newRequestTimeout;
             }
         }
     }

@@ -166,7 +166,7 @@ namespace
     struct MockTimeKeeper : public Http::TimeKeeper
     {
         // Properties
-        double currentTime = 0;
+        double currentTime = 0.0;
 
         // Methods
     public:
@@ -458,6 +458,9 @@ TEST_F(ServerTests, ServerTests_Mobiliz_Test) {
     auto transport = std::make_shared<MockTransport>();
     auto timeKeeper = std::make_shared<MockTimeKeeper>();
     const Http::Server::MobilizationDependencies dep = {transport, 1234, timeKeeper};
+    server.SetConfigurationItem("Port", "1234");
+    server.SetConfigurationItem("RequestTimeout", "1.0");
+    server.SetConfigurationItem("InactivityTimeout", "1.0");
     ASSERT_TRUE(server.Mobilize(dep));
     ASSERT_EQ(1234, transport->port);
     ASSERT_FALSE(transport->connectionDelegate == nullptr);
@@ -513,6 +516,8 @@ TEST_F(ServerTests, ServerTests_Expect404FromClientRequestInTwoPieces__Test) {
     auto transport = std::make_shared<MockTransport>();
     auto timeKeeper = std::make_shared<MockTimeKeeper>();
     const Http::Server::MobilizationDependencies dep = {transport, 1234, timeKeeper};
+    server.SetConfigurationItem("Port", "1234");
+    diagnosticMessages.clear();
     (void)server.Mobilize(dep);
     ASSERT_EQ((std::vector<std::string>{
                   "Http::Server[3]: Now listening on port 1234",
@@ -1069,28 +1074,26 @@ TEST_F(ServerTests, ServerTests_RequestInactivityTimeOut_Test) {
     dep.port = 1234;
     dep.transport = transport;
     dep.timeKeeper = timeKeeper;
-    (void)server.Mobilize(dep);
+    server.SetConfigurationItem("Port", "1234");
+    server.SetConfigurationItem("InactivityTimeout", "10.0");
+    server.SetConfigurationItem("RequestTimeout")(void) server.Mobilize(dep);
     auto connection = std::make_shared<MockConnection>();
     transport->connectionDelegate(connection);
     const std::string request =
         ("GET /foo/bar HTTP/1.1\r\n"
-         "Host: www.exemple.com\r\n"
-         "\r\n");
+         "Host: www.exemple.com\r\n");
     connection->dataReceivedDelegate(std::vector<uint8_t>(request.begin(), request.end()));
-    // timeKeeper->currentTime = 0.999;
-    // ASSERT_FALSE(connection->AwaitResponse());
-    // connection->dataReceivedDelegate({'x'});
+    timeKeeper->currentTime = 0.999;
+    ASSERT_FALSE(connection->AwaitResponse());
+    connection->dataReceivedDelegate({'x'});
     timeKeeper->currentTime = 1.001;
-    ASSERT_FALSE(connection->AwaitResponse());
-    timeKeeper->currentTime = 1.998;
-    ASSERT_FALSE(connection->AwaitResponse());
-    timeKeeper->currentTime = 2.000;
     ASSERT_TRUE(connection->AwaitResponse());
     Http::Client client;
     auto response = client.ParseResponse(
         std::string(connection->dataReceived.begin(), connection->dataReceived.end()));
     EXPECT_EQ(408, response->statusCode);
     EXPECT_EQ("Request Timeout", response->status);
+    ASSERT_TRUE(connection->broken);
 }
 
 TEST_F(ServerTests, MobiliseWhenAlreadyMobilized) {
