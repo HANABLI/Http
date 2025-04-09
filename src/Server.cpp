@@ -381,7 +381,8 @@ namespace Http
             while (!stopTimeKeeper)
             {
                 const auto now = timeKeeper->GetCurrentTime();
-                for (const auto& connectionState : establishedConnections)
+                auto connections = establishedConnections;
+                for (const auto& connectionState : connections)
                 {
                     if ((now - connectionState->timeLastDataReceived > inactivityTimeout) ||
                         (now - connectionState->timeLastRequestStarted > requestTimeout))
@@ -443,6 +444,21 @@ namespace Http
         }
 
         /**
+         * This method is called when a connection is broken,
+         * either on the server and or the client end.
+         * @param[in] connectionState
+         *      This is the state of the broken connection
+         */
+        void OnConnectionBroken(std::shared_ptr<ConnectionState> connectionState,
+                                const std::string& reason) {
+            diagnosticsSender.SendDiagnosticInformationFormatted(
+                2, "Connection to %s %s", connectionState->connection->GetPeerId().c_str(),
+                reason.c_str());
+            (void)brokenConnections.insert(connectionState);
+            condition.notify_all();
+            (void)establishedConnections.erase(connectionState);
+        }
+        /**
          * This method is called to sends the given response back to the client.
          *
          * @param connectionState
@@ -478,6 +494,7 @@ namespace Http
             {
                 connectionState->acceptingRequests = false;
                 connectionState->connection->Break(true);
+                OnConnectionBroken(connectionState, "close by server");
             }
         }
         /**
@@ -792,12 +809,7 @@ namespace Http
                     const auto connectionState = connectionStateWeak.lock();
                     if (connectionState == nullptr)
                     { return; }
-                    diagnosticsSender.SendDiagnosticInformationFormatted(
-                        2, "Connection to %s is broken by peer",
-                        connectionState->connection->GetPeerId().c_str());
-                    (void)brokenConnections.insert(connectionState);
-                    condition.notify_all();
-                    (void)establishedConnections.erase(connectionState);
+                    OnConnectionBroken(connectionState, "is broken by peer");
                 });
         }
     };

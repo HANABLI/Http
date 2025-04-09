@@ -103,7 +103,19 @@ namespace
             return waitCondition.wait_for(lock, std::chrono::milliseconds(100),
                                           [this] { return !dataReceived.empty(); });
         }
-
+        /**
+         * This method waits for the server to break the connection
+         *
+         * @return
+         *      An indication of wether or not the connection was broken
+         *      by the server before a reasonable timeout period has elapsed
+         *      is returned.
+         */
+        bool AwaitBroken() {
+            std::unique_lock<decltype(mutex)> lock(mutex);
+            return waitCondition.wait_for(lock, std::chrono::milliseconds(100),
+                                          [this] { return !dataReceived.empty(); });
+        }
         // Http::Connection
 
         virtual std::string GetPeerId() override { return "mock-client"; }
@@ -1076,7 +1088,8 @@ TEST_F(ServerTests, ServerTests_RequestInactivityTimeOut_Test) {
     dep.timeKeeper = timeKeeper;
     server.SetConfigurationItem("Port", "1234");
     server.SetConfigurationItem("InactivityTimeout", "10.0");
-    server.SetConfigurationItem("RequestTimeout")(void) server.Mobilize(dep);
+    server.SetConfigurationItem("RequestTimeout", "1.0");
+    (void)server.Mobilize(dep);
     auto connection = std::make_shared<MockConnection>();
     transport->connectionDelegate(connection);
     const std::string request =
@@ -1093,7 +1106,11 @@ TEST_F(ServerTests, ServerTests_RequestInactivityTimeOut_Test) {
         std::string(connection->dataReceived.begin(), connection->dataReceived.end()));
     EXPECT_EQ(408, response->statusCode);
     EXPECT_EQ("Request Timeout", response->status);
-    ASSERT_TRUE(connection->broken);
+    ASSERT_TRUE(connection->AwaitBroken());
+    connection->dataReceived.clear();
+    timeKeeper->currentTime = 1.001;
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    ASSERT_TRUE(connection->dataReceived.empty());
 }
 
 TEST_F(ServerTests, MobiliseWhenAlreadyMobilized) {
