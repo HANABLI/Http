@@ -44,14 +44,22 @@ namespace
     constexpr long long TIMER_POLLING_PERIOD_MILLISECONDS = 50;
 
     /**
-     * This is the defult maximum number of seconds to allow to elapse
+     * This is the default maximum number of seconds to allow to elapse
      * between receiving one byte of a client request and
      * receiving the next byte, before time out.
      */
     constexpr double DEFAULT_INACTIVITY_TIMEOUT_SECONDS = 1.0;
 
     /**
-     * This is teh defult maximum number of seconds to allow to elapse
+     * This is the default maximum number of seconds to allow to
+     * elapse between the end of a request, or the beginning of a
+     * connection, and receiving the first byte of a new client
+     * request, before timing out.
+     */
+    constexpr double DEFAULT_IDLE_TIMEOUT_SECONDS = 60.0;
+
+    /**
+     * This is teh default maximum number of seconds to allow to elapse
      * between receiving the first byte of a client request and
      * the last byte, before time out.
      */
@@ -181,6 +189,12 @@ namespace
          * requests from the client.
          */
         bool acceptingRequests = true;
+
+        /**
+         * This flag indicates whether or not the client is currently issuing
+         * a request to the server.
+         */
+        bool requestInProgress = false;
     };
 
     /**
@@ -257,9 +271,18 @@ namespace Http
         double requestTimeout = DEFAULT_REQUEST_TIMEOUT_SECONDS;
 
         /**
-         *
+         * This is the default maximum number of seconds to allow to
+         * elapse between the end of a request, or the beginning of a
+         * connection, and receiving the first byte of a new client
+         * request, before timing out.
          */
-        uint16_t port = DEFAULT_PORT_NUMBER;
+        double idleTimeout = DEFAULT_IDLE_TIMEOUT_SECONDS;
+
+        /**
+         * This is the defult public port number to which clients may connect
+         * to establish connections with the server.
+         */
+        uint16_t port;
 
         /**
          * This flag indicates whether or not the server is running.
@@ -384,8 +407,16 @@ namespace Http
                 auto connections = establishedConnections;
                 for (const auto& connectionState : connections)
                 {
-                    if ((now - connectionState->timeLastDataReceived > inactivityTimeout) ||
-                        (now - connectionState->timeLastRequestStarted > requestTimeout))
+                    bool timeout = false;
+                    if (connectionState->requestInProgress)
+                    {
+                        if ((now - connectionState->timeLastDataReceived > inactivityTimeout) ||
+                            (now - connectionState->timeLastRequestStarted > requestTimeout))
+                        { timeout = true; }
+
+                    } else if (now - connectionState->timeLastDataReceived > idleTimeout)
+                    { timeout = true; }
+                    if (timeout)
                     {
                         auto response = std::make_shared<Http::Client::Response>();
                         response->statusCode = 408;
@@ -425,7 +456,7 @@ namespace Http
             if (!connectionState->nextRequest->IsProcessed())
             { return nullptr; }
             const auto request = connectionState->nextRequest;
-            connectionState->nextRequest = std::make_shared<Request>();
+            StartNextRequest(connectionState);
             return request;
         }
 
@@ -439,6 +470,7 @@ namespace Http
         void StartNextRequest(std::shared_ptr<ConnectionState> connectionState) {
             connectionState->nextRequest = std::make_shared<Request>();
             const auto now = timeKeeper->GetCurrentTime();
+            connectionState->requestInProgress = !connectionState->concatenateBuffer.empty();
             connectionState->timeLastDataReceived = now;
             connectionState->timeLastRequestStarted = now;
         }
@@ -659,6 +691,7 @@ namespace Http
             if (!connectionState->acceptingRequests)
             { return; }
             const auto now = timeKeeper->GetCurrentTime();
+            connectionState->requestInProgress = true;
             connectionState->timeLastDataReceived = now;
             connectionState->concatenateBuffer += std::string(data.begin(), data.end());
             for (;;)
@@ -939,6 +972,16 @@ namespace Http
                     0, "RequestTimeout number changed from %lf to %lf", impl_->requestTimeout,
                     newRequestTimeout);
                 impl_->requestTimeout = newRequestTimeout;
+            }
+        } else if (key == "IdleTimeout")
+        {
+            double newIdleTimeout;
+            if (sscanf(value.c_str(), "%lf", &newIdleTimeout) == 1)
+            {
+                impl_->diagnosticsSender.SendDiagnosticInformationFormatted(
+                    0, "IdleTimeout number changed from %lf to %lf", impl_->idleTimeout,
+                    newIdleTimeout);
+                impl_->idleTimeout = newIdleTimeout;
             }
         }
     }

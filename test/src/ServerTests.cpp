@@ -114,7 +114,7 @@ namespace
         bool AwaitBroken() {
             std::unique_lock<decltype(mutex)> lock(mutex);
             return waitCondition.wait_for(lock, std::chrono::milliseconds(100),
-                                          [this] { return !dataReceived.empty(); });
+                                          [this] { return broken; });
         }
         // Http::Connection
 
@@ -135,7 +135,11 @@ namespace
             waitCondition.notify_all();
         }
 
-        virtual void Break(bool clean) override { broken = true; }
+        virtual void Break(bool clean) override {
+            std::lock_guard<decltype(mutex)> lock(mutex);
+            broken = true;
+            waitCondition.notify_all();
+        }
     };
 
     /**
@@ -1092,6 +1096,8 @@ TEST_F(ServerTests, ServerTests_RequestInactivityTimeOut_Test) {
     (void)server.Mobilize(dep);
     auto connection = std::make_shared<MockConnection>();
     transport->connectionDelegate(connection);
+    timeKeeper->currentTime = 1.001;
+    ASSERT_FALSE(connection->AwaitBroken());
     const std::string request =
         ("GET /foo/bar HTTP/1.1\r\n"
          "Host: www.exemple.com\r\n");
@@ -1188,4 +1194,37 @@ TEST_F(ServerTests, ServerTests_UpgradedConnexion__Test) {
     connection = nullptr;
     upgradedConnection = nullptr;
     ASSERT_TRUE(connectionDestroyed);
+}
+
+TEST_F(ServerTests, ServerTests_IdleTimeOut_Test) {
+    const auto transport = std::make_shared<MockTransport>();
+    auto timeKeeper = std::make_shared<MockTimeKeeper>();
+    Http::Server::MobilizationDependencies dep;
+    dep.port = 1234;
+    dep.transport = transport;
+    dep.timeKeeper = timeKeeper;
+    server.SetConfigurationItem("Port", "1234");
+    server.SetConfigurationItem("InactivityTimeout", "10.0");
+    server.SetConfigurationItem("RequestTimeout", "1.0");
+    server.SetConfigurationItem("IdleTimeout", "100.0");
+    (void)server.Mobilize(dep);
+    auto connection = std::make_shared<MockConnection>();
+    transport->connectionDelegate(connection);
+    timeKeeper->currentTime = 1.0009;
+    ASSERT_FALSE(connection->AwaitBroken());
+    const std::string request =
+        ("GET /foo/bar HTTP/1.1\r\n"
+         "Host: www.exemple.com\r\n"
+         "\r\n  ");
+    connection->dataReceivedDelegate(std::vector<uint8_t>(request.begin(), request.end()));
+    ASSERT_TRUE(connection->AwaitResponse());
+    connection->dataReceived.clear();
+    timeKeeper->currentTime = 2.00;
+    ASSERT_FALSE(connection->AwaitBroken());
+    connection->dataReceivedDelegate(std::vector<uint8_t>(request.begin(), request.end()));
+    ASSERT_TRUE(connection->AwaitResponse());
+    timeKeeper->currentTime = 30.00;
+    ASSERT_FALSE(connection->AwaitBroken());
+    timeKeeper->currentTime = 102.9;
+    ASSERT_TRUE(connection->AwaitBroken());
 }
