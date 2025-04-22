@@ -308,7 +308,7 @@ namespace Http
          * These are the client connections that have been broken an will
          * be destroyed by the reaper thread.
          */
-        std::set<std::shared_ptr<ConnectionState>> brokenConnections;
+        std::set<std::shared_ptr<ConnectionState>> connectionsToDrop;
 
         /**
          * This is a helper object used to generate and publish
@@ -318,7 +318,7 @@ namespace Http
 
         /**
          * This is a worker thread whose job is to clear the
-         * brokenConnections set. The reason we need to put broken
+         * connectionsToDrop set. The reason we need to put broken
          * connections there in the first place is because we can't
          * destroy a connection that is in the process of calling
          * us through one of the delegates we gave it.
@@ -382,15 +382,15 @@ namespace Http
             std::unique_lock<decltype(mutex)> lock(mutex);
             while (!stopReaper)
             {
-                std::set<std::shared_ptr<ConnectionState>> oldBrokenConnections(
-                    std::move(brokenConnections));
-                brokenConnections.clear();
+                std::set<std::shared_ptr<ConnectionState>> oldConnectionsToDrop(
+                    std::move(connectionsToDrop));
+                connectionsToDrop.clear();
                 {
                     lock.unlock();
-                    oldBrokenConnections.clear();
+                    oldConnectionsToDrop.clear();
                     lock.lock();
                 }
-                condition.wait(lock, [this] { return (stopReaper || !brokenConnections.empty()); });
+                condition.wait(lock, [this] { return (stopReaper || !connectionsToDrop.empty()); });
             }
         }
         /**
@@ -486,7 +486,7 @@ namespace Http
             diagnosticsSender.SendDiagnosticInformationFormatted(
                 2, "Connection to %s %s", connectionState->connection->GetPeerId().c_str(),
                 reason.c_str());
-            (void)brokenConnections.insert(connectionState);
+            (void)connectionsToDrop.insert(connectionState);
             condition.notify_all();
             (void)establishedConnections.erase(connectionState);
         }
@@ -786,7 +786,12 @@ namespace Http
                 }
                 IssueResponse(connectionState, response);
                 if (response->statusCode == 101)
-                { connectionState->connection = nullptr; }
+                { 
+                    connectionState->connection = nullptr; 
+                    (void)connectionsToDrop.insert(connectionState);
+                    condition.notify_all();
+                    (void)establishedConnections.erase(connectionState);
+                }
                 // if (request->state == Request::RequestParsingState::Complete) {
                 //     const auto connectionTockens =
                 //     request->headers.GetHeaderMultiValues("Connection"); bool closeRequested =
