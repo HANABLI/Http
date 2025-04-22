@@ -219,7 +219,7 @@ struct ServerTests : public ::testing::Test
     // ::testing::Test
 
     virtual void SetUp() {
-        server.SubscribeToDiagnostics(
+        diagnosticsUnsubscribeDelegate = server.SubscribeToDiagnostics(
             [this](std::string senderName, size_t level, std::string message)
             {
                 diagnosticMessages.push_back(StringUtils::sprintf("%s[%zu]: %s", senderName.c_str(),
@@ -230,7 +230,7 @@ struct ServerTests : public ::testing::Test
 
     virtual void TearDown() {
         server.Demobilize();
-        // diagnosticsUnsubscribeDelegate();
+        diagnosticsUnsubscribeDelegate();
     }
 };
 
@@ -1223,7 +1223,7 @@ TEST_F(ServerTests, ServerTests_IdleTimeOut_Test) {
     ASSERT_FALSE(connection->AwaitBroken());
     connection->dataReceivedDelegate(std::vector<uint8_t>(request.begin(), request.end()));
     ASSERT_TRUE(connection->AwaitResponse());
-    timeKeeper->currentTime = 30.00;
+    timeKeeper->currentTime = 3.00;
     ASSERT_FALSE(connection->AwaitBroken());
     timeKeeper->currentTime = 102.9;
     ASSERT_TRUE(connection->AwaitBroken());
