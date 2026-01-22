@@ -6,6 +6,7 @@
  */
 
 #include <gtest/gtest.h>
+#include <thread>
 #include <Http/Client.hpp>
 #include <Http/Connection.hpp>
 #include <Http/Server.hpp>
