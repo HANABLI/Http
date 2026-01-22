@@ -637,6 +637,8 @@ namespace Http
                     switch (
                         ParseSize(request->headers.GetHeaderValue("Content-Length"), contentLength))
                     {
+                    case ParseSizeResult::Success:
+                        break;
                     case ParseSizeResult::NotaNumber: {
                         request->state = Request::RequestParsingState::Error;
                         return messageEnd;
@@ -786,8 +788,8 @@ namespace Http
                 }
                 IssueResponse(connectionState, response);
                 if (response->statusCode == 101)
-                { 
-                    connectionState->connection = nullptr; 
+                {
+                    connectionState->connection = nullptr;
                     (void)connectionsToDrop.insert(connectionState);
                     condition.notify_all();
                     (void)establishedConnections.erase(connectionState);

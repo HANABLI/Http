@@ -75,7 +75,8 @@ namespace
             std::lock_guard<decltype(mutex)> lock(mutex);
             if (callingDelegate)
             {
-                *((int*)0) = 42;  // force a crash (use in a death test)
+                volatile int* p = nullptr;
+                *p = 42;  // force a crash (use in a death test)
             }
             if (onDestruction != nullptr)
             { onDestruction(); }
