@@ -6,7 +6,7 @@
 cmake_minimum_required(VERSION 3.20)
 set(this Http)
 
-set(Headers 
+set(Headers
     include/Http/IServer.hpp
     include/Http/Server.hpp
     include/Http/Client.hpp
@@ -15,13 +15,13 @@ set(Headers
     include/Http/ServerTransportLayer.hpp
 )
 
-set(Sources 
-    src/Server.cpp 
+set(Sources
+    src/Server.cpp
     src/Client.cpp
 )
 
 add_library(${this} STATIC ${Sources} ${Headers})
-set_target_properties(${this} PROPERTIES 
+set_target_properties(${this} PROPERTIES
     FOLDER Libraries
 )
 

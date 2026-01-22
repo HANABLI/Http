@@ -5,13 +5,13 @@
 cmake_minimum_required(VERSION 3.20)
 set(this HttpTests)
 
-set(SOURCES 
-    src/ClientTests.cpp 
+set(SOURCES
+    src/ClientTests.cpp
     src/ServerTests.cpp
 )
 
 add_executable(${this} ${SOURCES})
-set_target_properties(${this} PROPERTIES 
+set_target_properties(${this} PROPERTIES
     FOLDER Tests
 )
 
@@ -24,6 +24,6 @@ target_link_libraries(${this}
 )
 
 add_test(
-    NAME ${this} 
+    NAME ${this}
     COMMAND ${this}
 )
